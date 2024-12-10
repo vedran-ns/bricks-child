@@ -57,13 +57,13 @@ function send_data_belunga( $order_id){
       }
 
     if ( 200 != $response_code && ! empty( $response_message ) ) {
-        return echo  $response_code.' -- '.$response_message ;
+         echo  $response_code.' -- '.$response_message ;
     }
      if (is_wp_error($response) || 200 != $response_code) {
-        return echo $response->get_error_message();
+         echo $response->get_error_message();
     }
     if( ! $response_body ) {
-        return new WP_Error( 'nodata', 'No data on the movie or no such movie in the database' );
+        
     }    
 
 
