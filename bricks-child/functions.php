@@ -32,3 +32,4 @@ add_filter( 'bricks/builder/i18n', function( $i18n ) {
   return $i18n;
 } );
 
+include(get_stylesheet_directory()."/belunga/belunga-api.php") ;
