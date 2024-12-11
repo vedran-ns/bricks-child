@@ -21,7 +21,8 @@ function send_data_belunga( $order_id){
         $phone =  $product->get_billing_phone();
     
       
-     $args1 = array(
+     $args1 = [
+            "formObj" => [
                 'consentsSigned' => true,
                 'firstName' => $first_name,
                 'lastName' => $last_name,               
@@ -30,9 +31,10 @@ function send_data_belunga( $order_id){
                 'state' => $state,
                 'zip' => $postcode,
                 'email' => $email,
-                'phone' => $phone,
-                'masterId' => $order_id
-            );
+                'phone' => $phone,                
+            ],
+            'masterId' => $order_id
+     ];
 
 
     $args = json_encode($args1);
