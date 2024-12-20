@@ -20,7 +20,7 @@ function send_data_belunga( $order_id){
         $email = $order->get_billing_email();
         $phone =  $order->get_billing_phone();
         $product_sku = null;
-        foreach( $order->get_items( $'line_item' ) as $item_id => $item ) {
+        foreach( $order->get_items( 'line_item' ) as $item_id => $item ) {
             if( $item['variation_id'] > 0 ){
                 $product_id = $item['variation_id']; // variable product
             } else {
@@ -108,13 +108,13 @@ function order_post($data){
 //    var_dump(substr($token_, 0, 13));exit;
 
 //    if(is_null($token_) || base64_decode(substr($token_, 0, -5)) != "ApiAccess2019"){
-   if(is_null($token_) || $token_ !== "Token dXNlcm5hbWU6cGFzc3dvcmQ="){
+   if(is_null($token_) || $token_ !== "Token ababababababab"){
 
         return 'Access denied';
         exit;
     }
     elseif(isset($data['order_id']) && isset($data['shipper']) && isset($data['tracking_number']) && isset($data['ship_date'])){
-        wp_insert_post(
+        /*wp_insert_post(
             array(
                 'post_type' => 'ordering',
                 'post_status' => 'publish',
@@ -125,7 +125,7 @@ function order_post($data){
                   'ship_date' =>sanitize_text_field($data['ship_date'])
                 )
             )
-        );
+        );*/
 
         
     $product =  wc_get_order($data['order_id']);
