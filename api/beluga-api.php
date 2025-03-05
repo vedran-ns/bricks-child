@@ -111,7 +111,7 @@ function validate_with_external_api($order_id, $posted_data, $order) {
           'method' => 'POST',
           'httpversion' => '1.0',
           'headers' => array(
-           'Authorization' => 'Bearer z17DZCRW9jjUwuG3uRNr',
+           'Authorization' => '',
             'Content-Type' => 'application/json'),
           'body' => json_encode($args1, JSON_UNESCAPED_SLASHES)
            )
@@ -192,7 +192,7 @@ function validate_with_external_api($order_id, $posted_data, $order) {
           'method' => 'POST',
           'httpversion' => '1.0',
           'headers' => array(
-           'Authorization' => 'Bearer z17DZCRW9jjUwuG3uRNr',
+           'Authorization' => '',
             'Content-Type' => 'application/json'),
           'body' => json_encode($args_photos, JSON_UNESCAPED_SLASHES)
            )
