@@ -270,7 +270,7 @@ function add_custom_variation_fields_to_cart($cart_item_data, $product_id, $vari
         //'medicine_concentration',
         //'medicine_strength',
         'medicine_quantity',
-        'medicine_sig',
+        //'medicine_sig',
         //'medicine_refills',
     ];
 
@@ -293,7 +293,7 @@ function display_custom_variation_fields_in_cart($item_data, $cart_item) {
         //'custom_medicine_concentration' => __('Concentration', 'woocommerce'),
         //'custom_medicine_strength' => __('Strength', 'woocommerce'),
         'custom_medicine_quantity' => __('Quantity', 'woocommerce'),
-        'custom_medicine_sig' => __('Sig', 'woocommerce'),
+        //'custom_medicine_sig' => __('Sig', 'woocommerce'),
         //'custom_medicine_refills' => __('Refills', 'woocommerce'),
         //'medicine_pharmacy_notes' => __('Pharmacy Notes', 'woocommerce'),
        // 'medicine_category' => __('Category', 'woocommerce'),
@@ -568,7 +568,12 @@ function remove_product_from_cart_programmatically($product_id){
 }
 
 
-
+add_filter('site_transient_update_plugins', function ($transient) {
+    if (isset($transient->response['conditional-checkout-fields-for-woocommerce-custom/conditional-checkout-fields-for-woocommerce.php'])) {
+        unset($transient->response['conditional-checkout-fields-for-woocommerce-custom/conditional-checkout-fields-for-woocommerce.php']);
+    }
+    return $transient;
+});
 
 /*add_action('wp_loaded', 'remove_fme_ccfw_actions', 20);
 

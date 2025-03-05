@@ -111,7 +111,7 @@ function validate_with_external_api($order_id, $posted_data, $order) {
           'method' => 'POST',
           'httpversion' => '1.0',
           'headers' => array(
-           'Authorization' => '',
+           'Authorization' => 'Bearer z17DZCRW9jjUwuG3uRNr',
             'Content-Type' => 'application/json'),
           'body' => json_encode($args1, JSON_UNESCAPED_SLASHES)
            )
@@ -147,17 +147,9 @@ function validate_with_external_api($order_id, $posted_data, $order) {
         $order->update_meta_data('api_visitId', sanitize_text_field($response_data['data']['visitId']));
         $order->update_meta_data('api_payload_data', serialize($args1));
         //$order->add_order_note( $response_data['info'].'. VisitId: '.$response_data['data']['visitId'],true );
-        //$order->save(); // Ensure data is saved
+        $order->save(); // Ensure data is saved
 
-        // Temporarily disable customer note email
-        remove_action( 'woocommerce_new_customer_note', array( WC()->mailer()->emails['WC_Email_Customer_Note'], 'trigger' ) );
-
-        // Add the order note as a customer note (visible in My Account)
-        $order->add_order_note( $response_data['info'].'. VisitId: '.$response_data['data']['visitId'], true );
-        $order->save();
-
-        // Re-enable the customer note email action
-        add_action( 'woocommerce_new_customer_note', array( WC()->mailer()->emails['WC_Email_Customer_Note'], 'trigger' ) );
+            
 
 
         $image_fields = [];
@@ -192,34 +184,25 @@ function validate_with_external_api($order_id, $posted_data, $order) {
           'method' => 'POST',
           'httpversion' => '1.0',
           'headers' => array(
-           'Authorization' => '',
+           'Authorization' => 'Bearer z17DZCRW9jjUwuG3uRNr',
             'Content-Type' => 'application/json'),
           'body' => json_encode($args_photos, JSON_UNESCAPED_SLASHES)
            )
          );
 
     //write_log($response2);
-
-    // Temporarily disable customer note email
-        remove_action( 'woocommerce_new_customer_note', array( WC()->mailer()->emails['WC_Email_Customer_Note'], 'trigger' ) );
-
+    
     if (is_wp_error($response2)) {        
         $order->add_order_note( "Error sending images",true );
         $order->save(); 
     } else {        
         $response_body = wp_remote_retrieve_body($response2);
         $response_data = json_decode($response_body, true); 
-        $order->add_order_note( $response_data['info'],true );
+       // $order->add_order_note( $response_data['info'],true );
         $order->save(); // Ensure data is saved       
     }
 
-    // Re-enable the customer note email action
-        add_action( 'woocommerce_new_customer_note', array( WC()->mailer()->emails['WC_Email_Customer_Note'], 'trigger' ) );
-
-        
-        
     
-
      // Handle API response
 
       }
@@ -229,90 +212,7 @@ function validate_with_external_api($order_id, $posted_data, $order) {
 }
 
 
-//add_action( 'woocommerce_order_status_processing', 'send_data_belunga',10, 1 );
- 
-function send_data_belunga( $order_id){
 
-    $order =  wc_get_order($order_id);      
-        
-//USER DETAILS
-        
-        $first_name = $order->get_shipping_first_name() ? $order->get_shipping_first_name() :  $order->get_billing_first_name();
-        $last_name = $order->get_shipping_last_name() ? $order->get_shipping_last_name() : $order->get_billing_last_name();
-        $company = $order->get_shipping_company() ? $order->get_shipping_company() : $order->get_billing_company();
-        $address_1 = $order->get_shipping_address_1() ? $order->get_shipping_address_1() : $order->get_billing_address_1();        
-        $city = $order->get_shipping_city() ? $order->get_shipping_city() : $order->get_billing_city();
-        $state = $order->get_shipping_state() ? $order->get_shipping_state() : $order->get_billing_state();
-        $postcode = $order->get_shipping_postcode() ? $order->get_shipping_postcode() : $order->get_billing_postcode();
-        $email = $order->get_billing_email();
-        $phone =  $order->get_billing_phone();
-        $product_sku = null;
-        foreach( $order->get_items( 'line_item' ) as $item_id => $item ) {
-            if( $item['variation_id'] > 0 ){
-                $product_id = $item['variation_id']; // variable product
-            } else {
-                $product_id = $item['product_id']; // simple product
-            }
-            // Get the product object
-            $product = wc_get_product( $product_id );
-            $product_sku = $product->get_sku();
-        }
-      
-     $args1 = [
-            "formObj" => [
-                'consentsSigned' => true,
-                'firstName' => $first_name,
-                'lastName' => $last_name,               
-                'address' => $address_1,                
-                'city' => $city,
-                'state' => $state,
-                'zip' => $postcode,
-                'email' => $email,
-                'phone' => $phone,                
-            ],
-            'masterId' => $order_id,
-            'company' => 'soSoThin'
-     ];
-
-
-    $args = json_encode($args1);
-
-    $response = wp_remote_post( 'https://api-staging.belugahealth.com/visit/createNoPayPhotos', array(
-          'method' => 'POST',
-          'httpversion' => '1.0',
-          'headers' => array(
-           'Authorization' => 'Bearer z17DZCRW9jjUwuG3uRNr',
-            'Content-Type' => 'application/json'             ),
-          'body' => $args
-           )
-         );
-
-    write_log($response);
-
-    // Check answer code
-    $response_code    = wp_remote_retrieve_response_code( $response );
-    $response_message = wp_remote_retrieve_response_message( $response );
-    $response_body    = json_decode(wp_remote_retrieve_body( $response ));
-
-    if( 200 == $response_code ) {
-        //echo 'The form has been submited successfully';
-        write_log('The form has been submited successfully');
-      }
-
-    if ( 200 != $response_code && ! empty( $response_message ) ) {
-         //echo  $response_code.' -- '.$response_message ;
-         write_log($response_code.' -- '.$response_message);
-    }
-     if (is_wp_error($response) || 200 != $response_code) {
-         //echo $response->get_error_message();
-         write_log($response->get_error_message());
-    }
-    if( ! $response_body ) {
-        
-    }    
-
-
-};
 
 
 
