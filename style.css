@@ -8,3 +8,38 @@
  Version:      1.1
  Text Domain:  bricks
 */
+form.woocommerce-checkout.bricks-default-checkout {
+	display:block!important;
+	padding:20px!important;
+}
+.woocommerce-checkout #customer_details { 
+ 	margin-bottom: 60px;
+	border-bottom: 1px solid #aeaeae;
+}
+.woocommerce-checkout .woocommerce-additional-fields__field-wrapper label {
+  	font-weight: 400;
+}
+#id_photo_field, #full_body_image_field, #current_meds_side_efects_textarea_field, #prescription_picture_field, #selected_medical_conditions_field, #current_medical_conditions_field, #current_medications_list_dosages_field, #id_photo_content_field, #full_body_image_content_field, #consent_glp1_gip_content_field {
+	border: 1px solid rgba(128, 128, 128, 0.47);
+	padding: 12px;
+	margin: revert;
+	border-radius: 5px;
+}
+#not_eligible_field {
+	border: 2px solid #d21a1a;
+	padding: 12px;
+	margin-top: 40px;
+	border-radius: 5px;
+}
+#not_eligible_field h2 {
+  	color: #d21a1a;
+}
+#bmi_field, #inches_field {
+	  margin-bottom: 40px;
+}
+@media (min-width: 991px) {
+	.woocommerce-additional-fields__field-wrapper .form-row-first, .woocommerce-additional-fields__field-wrapper .form-row-last {
+		  height: 39px;
+		  padding-bottom: 50px !important;
+	}
+}
