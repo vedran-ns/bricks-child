@@ -582,7 +582,7 @@ function remove_product_from_cart_programmatically($product_id){
     }  
 }
 
-
+/*##################  prevent a custom conditional checkout plugin to be updated ######################*/
 add_filter('site_transient_update_plugins', function ($transient) {
     if (isset($transient->response['conditional-checkout-fields-for-woocommerce-custom/conditional-checkout-fields-for-woocommerce.php'])) {
         unset($transient->response['conditional-checkout-fields-for-woocommerce-custom/conditional-checkout-fields-for-woocommerce.php']);

@@ -144,9 +144,11 @@ function validate_with_external_api($order_id, $posted_data, $order) {
         $order->update_meta_data('api_masterId', sanitize_text_field($response_data['data']['masterId']));
         $order->update_meta_data('api_visitId', sanitize_text_field($response_data['data']['visitId']));
         $order->update_meta_data('api_payload_data', serialize($args1));
-        //$order->add_order_note( $response_data['info'].'. VisitId: '.$response_data['data']['visitId'],true );
+        $order->update_meta_data('api_response_visit_info', $response_data['info']);
+        $order->update_meta_data('api_payload_data', serialize($args1));
+        //$order->add_order_note( $response_data['info'].'. VisitId: '.$response_data['data']['visitId'],true );        
         $order->save(); // Ensure data is saved
-
+        add_custom_order_note( $order_id, $response_data['info'].'. VisitId: '.$response_data['data']['visitId'], true );
             
 
 
@@ -191,13 +193,16 @@ function validate_with_external_api($order_id, $posted_data, $order) {
     //write_log($response2);
     
     if (is_wp_error($response2)) {        
-        $order->add_order_note( "Error sending images",true );
-        $order->save(); 
+        //$order->add_order_note( "Error sending images.",true );
+        //$order->save(); 
+        add_custom_order_note( $order_id, "Error sending images.", true );
     } else {        
-        $response_body = wp_remote_retrieve_body($response2);
-        $response_data = json_decode($response_body, true); 
-       // $order->add_order_note( $response_data['info'],true );
-        $order->save(); // Ensure data is saved       
+        $response_body2 = wp_remote_retrieve_body($response2);
+        $response_data2 = json_decode($response_body2, true);
+        $order->update_meta_data('api_response_images_info', $response_data2['info']);
+       //$order->add_order_note( $response_data2['info'],true );        
+        $order->save(); // Ensure data is saved 
+        add_custom_order_note( $order_id, $response_data2['info'], true );      
     }
 
     
@@ -345,3 +350,43 @@ function compress_resize_encoded_images($image_fields,$posted_data) {
 }
 
 
+
+function add_custom_order_note( $order_id, $note, $public = false ) {
+    global $wpdb;
+
+    $customer_note = $public ? 1 : 0; // 1 = Public (Visible in My Account), 0 = Private
+
+    // Insert the order note into the comments table
+    $wpdb->insert(
+        $wpdb->prefix . 'comments',
+        array(
+            'comment_post_ID'      => $order_id,
+            'comment_author'       => 'WooCommerce',
+            'comment_author_email' => '',
+            'comment_author_url'   => '',
+            'comment_content'      => $note,
+            'comment_type'         => 'order_note',
+            'comment_parent'       => 0,
+            'user_id'              => 0,
+            'comment_approved'     => 1,
+        ),
+        array('%d', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d')
+    );
+
+    $comment_id = $wpdb->insert_id;
+
+    if ( $comment_id ) {
+        // Insert metadata to mark the note as public or private
+        $wpdb->insert(
+            $wpdb->prefix . 'commentmeta',
+            array(
+                'comment_id' => $comment_id,
+                'meta_key'   => 'is_customer_note',
+                'meta_value' => $customer_note
+            ),
+            array('%d', '%s', '%d')
+        );
+    }
+
+    return $comment_id; // Return the comment ID if needed
+}
