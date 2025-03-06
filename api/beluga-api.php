@@ -148,7 +148,7 @@ function validate_with_external_api($order_id, $posted_data, $order) {
         $order->update_meta_data('api_payload_data', serialize($args1));
         //$order->add_order_note( $response_data['info'].'. VisitId: '.$response_data['data']['visitId'],true );        
         $order->save(); // Ensure data is saved
-        add_custom_order_note( $order_id, $response_data['info'].'. VisitId: '.$response_data['data']['visitId'], true );
+        add_custom_order_note( $order_id, '(Beluga Health message) : '.$response_data['info'], true );
             
 
 
@@ -202,7 +202,7 @@ function validate_with_external_api($order_id, $posted_data, $order) {
         $order->update_meta_data('api_response_images_info', $response_data2['info']);
        //$order->add_order_note( $response_data2['info'],true );        
         $order->save(); // Ensure data is saved 
-        add_custom_order_note( $order_id, $response_data2['info'], true );      
+        add_custom_order_note( $order_id, '(Beluga Health message) : '.$response_data2['info'], true );      
     }
 
     

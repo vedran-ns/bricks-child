@@ -590,15 +590,16 @@ add_filter('site_transient_update_plugins', function ($transient) {
     return $transient;
 });
 
-/*add_action('wp_loaded', 'remove_fme_ccfw_actions', 20);
 
-function remove_fme_ccfw_actions() {
-    global $fme_ccfw_front; // Use the existing instance
 
-    if (isset($fme_ccfw_front)) {
-        remove_action('woocommerce_checkout_update_order_meta', array( $fme_ccfw_front, 'fme_ccfw_checkout_field_update_order_meta' ));
-        remove_action('woocommerce_checkout_fields', array( $fme_ccfw_front, 'addCartconditionsfields' ), 99999);
-        remove_action('woocommerce_checkout_fields', array( $fme_ccfw_front, 'fmeccfwaddCustomFieldsOrderFields' ), 9999);
-    }
-}*/
+
+
+add_action( 'woocommerce_email_customer_details', 'add_beluga_api_response_messages', 10, 4 );
+function add_beluga_api_response_messages( $order, $sent_to_admin, $plain_text, $email ) {
+    echo 'Beluga Health message: '.$order->get_meta('api_response_images_info').'. '. $order->get_meta('api_response_visit_info').'.';        
+}
+
+
+
+
 
