@@ -321,7 +321,7 @@ function add_custom_fields_to_variation_frontend($variation_data) {
         //'medicine_concentration' => 'Concentration',
         //'medicine_strength' => 'Strength',
         'medicine_quantity' => 'Quantity',
-        'medicine_sig' => 'Sig',
+        //'medicine_sig' => 'Sig',
         //'medicine_refills' => 'Refills',
         //'medicine_pharmacy_notes' => 'Pharmacy Notes',
        // 'medicine_category' => 'Category',
@@ -396,12 +396,40 @@ function limit_cart_to_one_product($passed, $product_id) {
 
     // Check if there's already a product in the cart
     if ($cart->get_cart_contents_count() > 0) {
-        // Empty the cart
-        $cart->empty_cart();
-        wc_add_notice(__('Your cart has been updated to only allow one product at a time.', 'woocommerce'), 'notice');
+         if( has_term( 'glp-1', 'product_cat', $product_id ) ) {     
+            // Empty the cart
+            $cart->empty_cart();
+            wc_add_notice(__('Your cart has been updated to only allow one GLP-1 medication at a time.', 'woocommerce'), 'notice');
+        }
+        else {
+            foreach ($cart->get_cart() as $cart_item_key => $cart_item) {             
+                //if(in_array($cart_item['data']->name, ['Semaglutide','Tirzepatide']))  {    
+                if( has_term( 'glp-1', 'product_cat', $cart_item['product_id'] ) ) {                           
+                    $cart->remove_cart_item($cart_item_key); 
+                    wc_add_notice(sprintf(__('Your cart has been updated. GLP-1 medication (%s) has been removed from the cart.', 'woocommerce') , $cart_item['data']->name ), 'notice');
+                    break;     
+                }  
+            }
+
+        }       
     }
 
     return $passed;
+}
+
+add_action('template_redirect', 'first_order_add_bag');
+function first_order_add_bag() { 
+    if (  WC()->cart->get_cart_contents_count() > 1 ) {
+        foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {             
+            //if(in_array($cart_item['data']->name, ['Semaglutide','Tirzepatide']))  {    
+            if( has_term( 'glp-1', 'product_cat', $cart_item['product_id'] ) ) {                           
+                WC()->cart->remove_cart_item($cart_item_key);       
+                wc_add_notice(__('Your cart has been updated to only allow one GLP-1 medication at a time.', 'woocommerce'), 'notice');
+                break;     
+            }  
+        }
+    }
+
 }
 
 /*##################  add script for calculating BMI on the checkout fields ######################*/
@@ -543,20 +571,7 @@ add_filter('woocommerce_order_item_get_formatted_meta_data', function ($formatte
 }, 10, 2);
 
 
-add_action('template_redirect', 'first_order_add_bag');
-function first_order_add_bag(){ 
-    if (  WC()->cart->get_cart_contents_count() > 1 ) {
-        foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) { 
-            //if ($cart_item['variation_id'] == $product_id) { 
-            if(in_array($cart_item['data']->name, ['Semaglutide','Tirzepatide']))  {                               
-                WC()->cart->remove_cart_item($cart_item_key);       
-                wc_add_notice(__('Your cart has been updated to only allow one GLP-1 product at a time.', 'woocommerce'), 'notice');
-                break;     
-            }  
-        }
-    }
 
-}
 
 function remove_product_from_cart_programmatically($product_id){
   

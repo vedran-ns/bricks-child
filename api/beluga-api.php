@@ -8,10 +8,7 @@
 add_action('woocommerce_checkout_order_processed', 'validate_with_external_api',10,3);
 
 function validate_with_external_api($order_id, $posted_data, $order) {
-
-    //write_log($_POST);
-    //write_log($posted_data);
-
+    
     $product_name = '';
     $product_sku = '';
     $product_med_cat = '';
@@ -36,7 +33,8 @@ function validate_with_external_api($order_id, $posted_data, $order) {
             $variation_id = 0;
         }
         
-        if(!in_array($product_name, ['Semaglutide','Tirzepatide']))  continue;
+        
+        if( !has_term( 'glp-1', 'product_cat', $product_id ) ) continue;
 
         // Get attributes from parent
         $pharmacy_id = $parent_product->get_attribute('pa_pharmacy-id');
@@ -57,7 +55,6 @@ function validate_with_external_api($order_id, $posted_data, $order) {
 
                 // Variation attributes
                 $current_med_use = $variation->get_attribute('pa_current-medication-use');
-                //$starter_dose = $product_name == 'Semaglutide' ? '0.25 mg' : ($product_name == 'Tirzepatide' ? '2.5 mg' : 'No Dose');
                 $weekly_dose_preference =  $variation->get_attribute('pa_weekly-dose') ;
                 $currentDose = 'current_dose_'.strtolower($product_name);
             }
@@ -65,8 +62,9 @@ function validate_with_external_api($order_id, $posted_data, $order) {
 
     }
 
-    if(!in_array($product_name, ['Semaglutide','Tirzepatide']))  return;
- 
+    
+    if( !has_term( 'glp-1', 'product_cat', $product_id ) ) return;
+
     $args1 = [
             "formObj" => [
                 "consentsSigned"=> true,
@@ -84,8 +82,8 @@ function validate_with_external_api($order_id, $posted_data, $order) {
                 "allergies" => isset($posted_data['current_allergies_list']) ? sanitize_text_field($posted_data['current_allergies_list']) : '',
                 "medicalConditions" => isset($posted_data['current_medical_conditions']) ? sanitize_text_field($posted_data['current_medical_conditions']) : '',
                 "currentWeightloss" => isset($posted_data['current_meds_sem_tirz']) ? sanitize_text_field($posted_data['current_meds_sem_tirz']) : '',
-                "weightlossPreference" => isset($posted_data['new_dose']) ? sanitize_text_field($posted_data['new_dose']) : '',
-                "currentDose" => isset($posted_data[$currentDose]) ? sanitize_text_field($posted_data[$currentDose]) : '',
+                "weightlossPreference" => isset($posted_data['new_dose']) ? sanitize_text_field($posted_data['new_dose']) : 'N/A',
+                "currentDose" => isset($posted_data[$currentDose]) ? sanitize_text_field($posted_data[$currentDose]) : 'N/A',
                 "patientPreference" => [
                     [
                         "name" => $product_name.' '.$weekly_dose_preference,
