@@ -463,27 +463,32 @@ function woocommerce_checkout_scripts() {
 			$('#current_meds_sem_tirz_field input:not(#<?php echo  $current_med_use_input_id ?>)').attr('disabled', true);	
 			$('#current_meds_sem_tirz_field input:not(#<?php echo  $current_med_use_input_id ?>)').css('display', 'none');	
 			$('#current_meds_sem_tirz_field label:not(label[for="<?php echo  $current_med_use_input_id ?>"]):not(label[for="current_meds_sem_tirz_0"])').hide();
-			jQuery('#feet, #inches, #pounds').on('keyup mouseup', function () {
-		// Get values from the input fields
-		const feet = parseFloat(jQuery('#feet').val()) || 0;
-		const inches = parseFloat(jQuery('#inches').val()) || 0;
-		const pounds = parseFloat(jQuery('#pounds').val()) || 0;
+            $('#condition_noneoftheabove').change(function() {
+              if(this.checked) $('input[name^="condition_"]').not(this).prop('checked',false).trigger('change');
+            });
 
-		// Convert feet and inches to total inches
-		const totalInches = (feet * 12) + inches;
 
-		if (totalInches > 0) {
-			// Calculate BMI
-			const bmi = (pounds / (totalInches * totalInches)) * 703;
+			$('#feet, #inches, #pounds').on('keyup mouseup', function () {
+        		// Get values from the input fields
+        		const feet = parseFloat(jQuery('#feet').val()) || 0;
+        		const inches = parseFloat(jQuery('#inches').val()) || 0;
+        		const pounds = parseFloat(jQuery('#pounds').val()) || 0;
 
-			// Display BMI in the #bmi_field element
-			//jQuery('#bmi_field').html('<h5 style="font-weight: 400;padding-top: 10px;"> Your BMI is: ' + bmi.toFixed(2) + '</h5>');
-			jQuery('#bmi').val(bmi.toFixed(2)).trigger('change');
-		} else {
-			// Handle invalid height input
-			jQuery('#bmi').html('<h5 style="font-weight: 400;padding-top: 10px;"> Your BMI is: ' + 'Enter valid height.'+ '</h5>');
-		}
-	});
+        		// Convert feet and inches to total inches
+        		const totalInches = (feet * 12) + inches;
+
+        		if (totalInches > 0) {
+        			// Calculate BMI
+        			const bmi = (pounds / (totalInches * totalInches)) * 703;
+
+        			// Display BMI in the #bmi_field element
+        			//jQuery('#bmi_field').html('<h5 style="font-weight: 400;padding-top: 10px;"> Your BMI is: ' + bmi.toFixed(2) + '</h5>');
+        			jQuery('#bmi').val(bmi.toFixed(2)).trigger('change');
+        		} else {
+        			// Handle invalid height input
+        			jQuery('#bmi').html('<h5 style="font-weight: 400;padding-top: 10px;"> Your BMI is: ' + 'Enter valid height.'+ '</h5>');
+        		}
+        	});
 
 		});
 			
@@ -596,7 +601,7 @@ add_filter('site_transient_update_plugins', function ($transient) {
 
 add_action( 'woocommerce_email_customer_details', 'add_beluga_api_response_messages', 10, 4 );
 function add_beluga_api_response_messages( $order, $sent_to_admin, $plain_text, $email ) {
-    echo 'Beluga Health message: '.$order->get_meta('api_response_images_info').'. '. $order->get_meta('api_response_visit_info').'.';        
+    echo '<p>(Beluga Health message): '.$order->get_meta('api_response_visit_info').'. '. $order->get_meta('api_response_images_info').'.</p>';        
 }
 
 

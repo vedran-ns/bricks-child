@@ -142,8 +142,7 @@ function validate_with_external_api($order_id, $posted_data, $order) {
 
         // If API is successful, store masterId and visitId in order meta
         $order->update_meta_data('api_masterId', sanitize_text_field($response_data['data']['masterId']));
-        $order->update_meta_data('api_visitId', sanitize_text_field($response_data['data']['visitId']));
-        $order->update_meta_data('api_payload_data', serialize($args1));
+        $order->update_meta_data('api_visitId', sanitize_text_field($response_data['data']['visitId']));        
         $order->update_meta_data('api_response_visit_info', $response_data['info']);
         $order->update_meta_data('api_payload_data', serialize($args1));
         //$order->add_order_note( $response_data['info'].'. VisitId: '.$response_data['data']['visitId'],true );        
@@ -167,7 +166,7 @@ function validate_with_external_api($order_id, $posted_data, $order) {
         }
 
          
-        $images_base64_codes = $image_fields ? compress_resize_encoded_images($image_fields,$posted_data) : array();
+        $images_base64_codes = $image_fields ? compress_resize_encode_images($image_fields,$posted_data) : array();
         //write_log($images_base64_codes);
 
         $args_imgs = [];
@@ -282,7 +281,7 @@ function write_log($log) {
         }
     }
 
-function compress_resize_encoded_images($image_fields,$posted_data) {
+function compress_resize_encode_images($image_fields,$posted_data) {
     
     $processed_images = [];
 
@@ -340,6 +339,11 @@ function compress_resize_encoded_images($image_fields,$posted_data) {
         $processed_images[$field] = $base64_image;
 
         unlink($temp_file); // Clean up temp file
+
+         // *** Remove the original uploaded file from wp-content/uploads ***
+        if (file_exists($file_path)) {
+            unlink($file_path);
+        }
     }
 
     // Save or process $processed_images as needed (e.g., store in database or session)
