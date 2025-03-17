@@ -7,7 +7,7 @@ function validate_with_external_api() {
 
     $posted_data = WC()->checkout->get_posted_data();
 
-    write_log($posted_data);  
+    //write_log($posted_data);  
     
     $product_name = '';
     $product_sku = '';
@@ -69,7 +69,7 @@ function validate_with_external_api() {
     foreach ($posted_data as $key => $value) {
         if( strpos( $key, 'condition_' ) === 0 && !empty($value) ) {
             if($key == 'condition_noneoftheabove'){
-                $current_past_med_conds_array = ['None'];
+                $current_past_med_conds_array = [];
             }
             else {
                 $condition = str_replace(['condition_','_'], ['',' '], $key);
@@ -128,11 +128,11 @@ function validate_with_external_api() {
     }
 
     $args1["formObj"]["Q".$i] = "What is your height in feet and inches?";
-    $args1["formObj"]["A".$i++] = isset($posted_data['feet']) && isset($posted_data['inches']) ? $posted_data['feet']." ' ".$posted_data['inches'] : '';
+    $args1["formObj"]["A".$i++] = isset($posted_data['feet']) && isset($posted_data['inches']) ? sanitize_text_field($posted_data['feet'])." ' ".sanitize_text_field($posted_data['inches']) : '';
     $args1["formObj"]["Q".$i] = "What is your weight in pounds?";
-    $args1["formObj"]["A".$i++] = isset($posted_data['pounds']) ? $posted_data['pounds'] : '';
+    $args1["formObj"]["A".$i++] = isset($posted_data['pounds']) ? sanitize_text_field($posted_data['pounds']) : '';
     $args1["formObj"]["Q".$i] = "Your BMI is";
-    $args1["formObj"]["A".$i++] = isset($posted_data['bmi']) ? $posted_data['bmi'] : '';
+    $args1["formObj"]["A".$i++] = isset($posted_data['bmi']) ? sanitize_text_field($posted_data['bmi']) : '';
     $args1["formObj"]["Q".$i] = "Consent (BMI): The traditional use of weight loss medications is for individuals with a BMI of 30 and above or to those who are overweight who have associated health conditions. Using it for someone with a BMI range (27-29) without an accompanying health condition is termed \"off-label.\" Using a medication \"off-label\" refers to the practice of prescribing a drug for a purpose, age group, dosage, or form of administration that is not included in the approved labeling by regulatory agencies like the U.S. Food and Drug Administration (FDA). While a medication undergoes rigorous testing for specific uses before receiving approval, healthcare providers may discover through clinical experience or research that it can be effective for treating other conditions. There may be benefits such as weight reduction for individuals within your range. If you agree to this off-label use, it's crucial to follow the prescribed regimen and report any concerns. Please discuss any questions with us.";
     $args1["formObj"]["A".$i++] = "I acknowledge that I have read and understood the above information.";
     $args1["formObj"]["Q".$i] = "Your current or past medical conditions?";
@@ -143,7 +143,30 @@ function validate_with_external_api() {
         $args1["formObj"]["A".$i++] = "I acknowledge that I have read and understood the above information.";
     }
 
+    if(!empty($current_past_med_conds_array)) {
+        $args1["formObj"]["Q".$i] = "Please tell us more about your medical condition(s) that you selected:";
+        $args1["formObj"]["A".$i++] = isset($posted_data['selected_medical_conditions']) ? sanitize_text_field($posted_data['selected_medical_conditions']) : '';
+    }
 
+    $args1["formObj"]["Q".$i] = "Have you had a gastric bypass in the past 6 months? POSSIBLE ANSWERS: Yes; No";
+    $args1["formObj"]["A".$i++] = isset($posted_data['gastric_bypass']) ? $posted_data['gastric_bypass'] : '';
+    $args1["formObj"]["Q".$i] = "Are you allergic to any of the following: Ozempic (Semaglutide), Mounjaro (Tirzepatide), Wegovy (Semaglutide), Zepbound (Tirzepatide), Saxenda (Liraglutide), Trulicity (dulaglutide) ? POSSIBLE ANSWERS: Yes; No";
+    $args1["formObj"]["A".$i++] = isset($posted_data['allergic_any_glp1_med']) ? $posted_data['allergic_any_glp1_med'] : '';
+    $args1["formObj"]["Q".$i] = "Do you take any of the following medications: Insulin Glimepiride (Amaryl), Meglitinides such as repaglinide or nateglinide, Glipizide (Glucotrol and Glucotrol XL), Glyburide (Micronase, Glynase, and Diabeta), Sitagliptin, Saxagliptin, Linagliptin, Alogliptin? POSSIBLE ANSWERS: Yes; No";
+    $args1["formObj"]["A".$i++] = isset($posted_data['prohibited_medications']) ? $posted_data['prohibited_medications'] : '';
+    $args1["formObj"]["Q".$i] = "Are you currently, or have you in the past two months, taken any GLP-1 medications? POSSIBLE ANSWERS: Semaglutide (Ozempic, Wegovy, Rybelsus); Tirzepatide (Zepbound, Mounjaro);None of these";
+    $args1["formObj"]["A".$i++] = isset($posted_data['current_meds_sem_tirz']) ? ( $posted_data['current_meds_sem_tirz']=='semaglutide' ? 'Semaglutide (Ozempic, Wegovy, Rybelsus) ' : ( $posted_data['current_meds_sem_tirz']=='tirzepatide' ? 'Tirzepatide (Zepbound, Mounjaro) ' : 'None of these' ) ) : '';
+
+    if($posted_data['current_meds_sem_tirz']=='semaglutide' || $posted_data['current_meds_sem_tirz']=='tirzepatide' ) {
+        $args1["formObj"]["Q".$i] = "Have you experienced side effects from your current medication? POSSIBLE ANSWERS: Yes; No";
+        $args1["formObj"]["A".$i++] = isset($posted_data['current_meds_side_efects']) ? $posted_data['current_meds_side_efects'] : '';
+
+        if($posted_data['current_meds_side_efects'] == 'Yes') {
+            $args1["formObj"]["Q".$i] = "Please describe the side effects that you've experienced";
+            $args1["formObj"]["A".$i++] = isset($posted_data['current_meds_side_efects_textarea']) ? sanitize_text_field($posted_data['current_meds_side_efects_textarea']) : '';
+
+        }
+    }
 
        write_log($args1); 
       wc_add_notice('Your order could not be processed. Please check your details and try again.', 'error');
