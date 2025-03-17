@@ -283,7 +283,7 @@ add_action('woocommerce_checkout_order_processed', 'validate_with_external_api_b
 
 function validate_with_external_api_b($order_id, $posted_data, $order) {
 
-    if( !empty(WC()->session->get( 'masterId')) && !empty(WC()->session->get( 'visitId')) && !empty(WC()->session->get('responseVisitInfo')) && !empty(WC()->session->get( 'requestArgs')) ) {
+    if( !empty(WC()->session->get( 'masterId')) && !empty(WC()->session->get( 'visitId')) && !empty(WC()->session->get('responseVisitInfo')) && !empty(WC()->session->get('responseImagesInfo')) && !empty(WC()->session->get( 'payloadData')) ) {
 
         $order->update_meta_data('api_masterId', sanitize_text_field(WC()->session->get('masterId')));
         $order->update_meta_data('api_visitId', sanitize_text_field(WC()->session->get('visitId')));        
@@ -292,7 +292,8 @@ function validate_with_external_api_b($order_id, $posted_data, $order) {
         $order->update_meta_data('api_payload_data', serialize(WC()->session->get('payloadData')));      
         $order->save(); // Ensure data is saved
         add_custom_order_note( $order_id, '(Beluga Health message) : '.WC()->session->get('responseVisitInfo'), true );
-
+        add_custom_order_note( $order_id, '(Beluga Health message) : '.WC()->session->get('responseImagesInfo'), true );
+        
     }
 
    
