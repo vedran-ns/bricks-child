@@ -466,6 +466,12 @@ function woocommerce_checkout_scripts() {
             $('#condition_noneoftheabove').change(function() {
               if(this.checked) $('input[name^="condition_"]').not(this).prop('checked',false).trigger('change');
             });
+            $('input[name^="condition_"]').not('#condition_noneoftheabove').change(function() {
+                if (this.checked && $('#condition_noneoftheabove').prop('checked')) {
+                    $('#condition_noneoftheabove').prop('checked', false).trigger('change');
+                }
+            });
+
 
 
 			$('#feet, #inches, #pounds').on('keyup mouseup', function () {

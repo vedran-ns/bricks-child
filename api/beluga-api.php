@@ -1,13 +1,13 @@
 <?php
     defined( 'ABSPATH' ) || die( "Can't access directly" );
 
-//add_action('woocommerce_checkout_process', 'validate_with_external_api');
+add_action('woocommerce_before_checkout_process', 'validate_with_external_api');
 
-//function validate_with_external_api() {
+function validate_with_external_api() {
 
-add_action('woocommerce_checkout_order_processed', 'validate_with_external_api',10,3);
+    $posted_data = WC()->checkout->get_posted_data();
 
-function validate_with_external_api($order_id, $posted_data, $order) {
+    write_log($posted_data);  
     
     $product_name = '';
     $product_sku = '';
@@ -20,7 +20,7 @@ function validate_with_external_api($order_id, $posted_data, $order) {
     $visit_type = '';
     $pharmacy_id = '';
 
-    foreach( $order->get_items( 'line_item' ) as $item_id => $item ) {
+    foreach( WC()->cart->get_cart() as $cart_item_key => $item ) {
 
         // Get parent product object
         $product_id = $item['product_id'];
@@ -65,6 +65,22 @@ function validate_with_external_api($order_id, $posted_data, $order) {
     
     if( !has_term( 'glp-1', 'product_cat', $product_id ) ) return;
 
+    $current_past_med_conds_array = [];
+    foreach ($posted_data as $key => $value) {
+        if( strpos( $key, 'condition_' ) === 0 && !empty($value) ) {
+            if($key == 'condition_noneoftheabove'){
+                $current_past_med_conds_array = ['None'];
+            }
+            else {
+                $condition = str_replace(['condition_','_'], ['',' '], $key);
+                $current_past_med_conds_array[]= $condition;
+            }
+        }
+    }
+    $current_past_med_conds = !empty($current_past_med_conds_array) ? implode(', ', $current_past_med_conds_array) : 'None';
+
+    $masterId = uniqid(substr($posted_data['billing_first_name'], 0, 1).substr($posted_data['billing_last_name'], 0, 1).'_');
+
     $args1 = [
             "formObj" => [
                 "consentsSigned"=> true,
@@ -92,19 +108,47 @@ function validate_with_external_api($order_id, $posted_data, $order) {
                         "refills" => $product_med_ref,
                         "medId" => $product_sku
                     ]
-                ],
-                "Q1" => "Are you currently pregnant, breastfeeding or planning to become pregnant? POSSIBLE ANSWERS: Yes; No",
-                "A1" => isset($posted_data['pregnant']) ? $posted_data['pregnant'] : '',             
+                ],                         
             ],
-            "masterId" => "".$order_id."",
+            "masterId" => "".$masterId."",
             "company" => 'soSoThin',
             "pharmacyId" => $pharmacy_id,
             "visitType" => $visit_type
-     ];
+    ];
 
-       write_log($args1);  
+    $i = 1;
+    $args1["formObj"]["Q".$i] = "What was your sex assigned at birth? POSSIBLE ANSWERS: Male; Female; Other";
+    $args1["formObj"]["A".$i++] = isset($posted_data['sex']) ? $posted_data['sex'] : '';
 
-    $response = wp_remote_post( 'https://api-staging.belugahealth.com/visit/createNoPayPhotos', 
+    if($posted_data['sex'] == 'Female') {
+        $args1["formObj"]["Q".$i] = "Are you currently pregnant, breastfeeding or planning to become pregnant? POSSIBLE ANSWERS: Yes; No";
+        $args1["formObj"]["A".$i++] = isset($posted_data['pregnant']) ? $posted_data['pregnant'] : '';
+        $args1["formObj"]["Q".$i] = "Consent (pregnancy): Read the following for more information about this product and its potential side effects: It is not safe to take these medications while pregnant or breastfeeding. The FDA advises that these medications may pose a risk to a developing fetus. Oral contraceptives alone may not be effective, as the medication can reduce their effectiveness. The FDA specifically recommends continuing oral contraception alongside a barrier method (like condoms) for the first month after starting a weight loss medication and for the first month after any dose increase. Alternatively, you can switch to a non-oral contraceptive method (such as an IUD or implant) before beginning the medication. After stopping the medication, you should continue using a backup method, such as condoms, for two months to ensure the medication has fully cleared your system before trying to conceive. Additionally, its safety during breastfeeding is unknown, so if you are nursing, consult your doctor to explore safer weight loss options.";
+        $args1["formObj"]["A".$i++] = "I acknowledge that I have read and understood the above information.";
+    }
+
+    $args1["formObj"]["Q".$i] = "What is your height in feet and inches?";
+    $args1["formObj"]["A".$i++] = isset($posted_data['feet']) && isset($posted_data['inches']) ? $posted_data['feet']." ' ".$posted_data['inches'] : '';
+    $args1["formObj"]["Q".$i] = "What is your weight in pounds?";
+    $args1["formObj"]["A".$i++] = isset($posted_data['pounds']) ? $posted_data['pounds'] : '';
+    $args1["formObj"]["Q".$i] = "Your BMI is";
+    $args1["formObj"]["A".$i++] = isset($posted_data['bmi']) ? $posted_data['bmi'] : '';
+    $args1["formObj"]["Q".$i] = "Consent (BMI): The traditional use of weight loss medications is for individuals with a BMI of 30 and above or to those who are overweight who have associated health conditions. Using it for someone with a BMI range (27-29) without an accompanying health condition is termed \"off-label.\" Using a medication \"off-label\" refers to the practice of prescribing a drug for a purpose, age group, dosage, or form of administration that is not included in the approved labeling by regulatory agencies like the U.S. Food and Drug Administration (FDA). While a medication undergoes rigorous testing for specific uses before receiving approval, healthcare providers may discover through clinical experience or research that it can be effective for treating other conditions. There may be benefits such as weight reduction for individuals within your range. If you agree to this off-label use, it's crucial to follow the prescribed regimen and report any concerns. Please discuss any questions with us.";
+    $args1["formObj"]["A".$i++] = "I acknowledge that I have read and understood the above information.";
+    $args1["formObj"]["Q".$i] = "Your current or past medical conditions?";
+    $args1["formObj"]["A".$i++] = $current_past_med_conds;
+
+    if($posted_data['condition_gallbladder']) {
+        $args1["formObj"]["Q".$i] = "Consent (Gallbladde): Read the following for more information about this product and its potential side effects.Gallbladder disease information:You noted that you have gallbladder disease or previous removal of our gallbladder. This medication may still be a good option. However, this medication can affect how the body handles fats and bile. If you have had your gallbladder removed, the body's ability to store and release bile is altered. Bile is crucial for digestion and fat absorption. This medication may increase the likelihood of gastrointestinal side effects in these individuals because it can alter fat metabolism and bile flow. This can lead to symptoms such as diarrhea and stomach pain. Additionally, medications that affect digestion and appetite, like this medication, might alter the absorption and metabolism of other nutrients (like fat soluble vitamins such as vitamin A, D, E, and K) and medications. This is particularly important for those without a gallbladder, as their digestive system already operates differently from those with a functioning gallbladder. If you wish to move forward, it is important to eat smaller and more frequent meals. In addition, to ensure that you're receiving enough vitamins, you should avoid processed foods while eating plenty of fruits and vegetables, as well as considering the use of a multi-vitamin unless told by your provider to avoid these for other reasons. If you have asymptomatic gallstones, please note that these medications and weight loss itself may result in gallstone formation which could result in the obstruction of the normal flow of bile which can result in infection, pancreatitis, and/or emergent need for gallbladder removal. It is important to receive prompt medical evaluation if symptoms appear as delayed action may result in serious harm or death if untreated.";
+        $args1["formObj"]["A".$i++] = "I acknowledge that I have read and understood the above information.";
+    }
+
+
+
+       write_log($args1); 
+      wc_add_notice('Your order could not be processed. Please check your details and try again.', 'error');
+
+    /*$response = wp_remote_post( 'https://api-staging.belugahealth.com/visit/createNoPayPhotos', 
         array(
           'method' => 'POST',
           'httpversion' => '1.0',
@@ -119,35 +163,35 @@ function validate_with_external_api($order_id, $posted_data, $order) {
 
      // Handle API response
     if (is_wp_error($response)) {
-        $error_message = 'There was an error connecting to the validation service. Please try again.';
+        $error_message = 'There was an error connecting to the validation service. Please try again. ('.$response_data['error'].')';
     } else {
         $response_code = wp_remote_retrieve_response_code($response);
         $response_body = wp_remote_retrieve_body($response);
         $response_data = json_decode($response_body, true);
 
         if ($response_code !== 200 || !isset($response_data['data']['masterId'], $response_data['data']['visitId'])) {
-            $error_message = 'Your order could not be processed. Please check your details and try again.';
+            $error_message = 'Your order could not be processed. Please check your details and try again. ('.$response_data['error'].')';
         }
     }
 
     // If API request failed, cancel order and throw error
-    if (!empty($error_message)) {
+    if (!empty($error_message)) {         
 
-         
+        write_log($error_message);       
 
-        write_log($error_message);
-        wp_delete_post($order_id, true);
+        // Ensure no further processing happens
+        wc_add_notice($error_message, 'error');
+
     }
     else {
 
-        // If API is successful, store masterId and visitId in order meta
-        $order->update_meta_data('api_masterId', sanitize_text_field($response_data['data']['masterId']));
-        $order->update_meta_data('api_visitId', sanitize_text_field($response_data['data']['visitId']));        
-        $order->update_meta_data('api_response_visit_info', $response_data['info']);
-        $order->update_meta_data('api_payload_data', serialize($args1));
-        //$order->add_order_note( $response_data['info'].'. VisitId: '.$response_data['data']['visitId'],true );        
-        $order->save(); // Ensure data is saved
-        add_custom_order_note( $order_id, '(Beluga Health message) : '.$response_data['info'], true );
+        // If API is successful, store masterId,visitId,responseInfo,payloadData in wc session        
+        if (WC()->session) {
+            WC()->session->set('masterId', $response_data['data']['masterId']); 
+            WC()->session->set('visitId', $response_data['data']['visitId']); 
+            WC()->session->set('responseVisitInfo', $response_data['info']);           
+            WC()->session->set('payloadData', $args1);
+        }
             
 
 
@@ -189,26 +233,44 @@ function validate_with_external_api($order_id, $posted_data, $order) {
            )
          );
 
-    //write_log($response2);
+        //write_log($response2);
+        
+        if (is_wp_error($response2)) {
+             if (WC()->session)         
+                WC()->session->set('responseImagesInfo', "Error sending images.");            
+        } else {        
+            $response_body2 = wp_remote_retrieve_body($response2);
+            $response_data2 = json_decode($response_body2, true);
+            if (WC()->session) 
+                WC()->session->set('responseImagesInfo', $response_data2['info']);      
+        }
+
     
-    if (is_wp_error($response2)) {        
-        //$order->add_order_note( "Error sending images.",true );
-        //$order->save(); 
-        add_custom_order_note( $order_id, "Error sending images.", true );
-    } else {        
-        $response_body2 = wp_remote_retrieve_body($response2);
-        $response_data2 = json_decode($response_body2, true);
-        $order->update_meta_data('api_response_images_info', $response_data2['info']);
-       //$order->add_order_note( $response_data2['info'],true );        
-        $order->save(); // Ensure data is saved 
-        add_custom_order_note( $order_id, '(Beluga Health message) : '.$response_data2['info'], true );      
+    }*/
+
+    
+    
+    //wc_add_notice('Your order could not be processed. Please check your details and try again.', 'error');
+}
+
+
+
+
+add_action('woocommerce_checkout_order_processed', 'validate_with_external_api_b',10,3);
+
+function validate_with_external_api_b($order_id, $posted_data, $order) {
+
+    if( !empty(WC()->session->get( 'masterId')) && !empty(WC()->session->get( 'visitId')) && !empty(WC()->session->get('responseVisitInfo')) && !empty(WC()->session->get( 'requestArgs')) ) {
+
+        $order->update_meta_data('api_masterId', sanitize_text_field(WC()->session->get('masterId')));
+        $order->update_meta_data('api_visitId', sanitize_text_field(WC()->session->get('visitId')));        
+        $order->update_meta_data('api_response_visit_info', WC()->session->get('responseVisitInfo'));
+        $order->update_meta_data('api_response_images_info', WC()->session->get('responseImagesInfo'));
+        $order->update_meta_data('api_payload_data', serialize(WC()->session->get('payloadData')));      
+        $order->save(); // Ensure data is saved
+        add_custom_order_note( $order_id, '(Beluga Health message) : '.WC()->session->get('responseVisitInfo'), true );
+
     }
-
-    
-     // Handle API response
-
-      }
-
 
    
 }
@@ -394,3 +456,5 @@ function add_custom_order_note( $order_id, $note, $public = false ) {
 
     return $comment_id; // Return the comment ID if needed
 }
+
+
