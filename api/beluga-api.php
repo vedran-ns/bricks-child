@@ -56,7 +56,7 @@ function validate_with_external_api() {
                 // Variation attributes
                 $current_med_use = $variation->get_attribute('pa_current-medication-use');
                 $weekly_dose_preference =  $variation->get_attribute('pa_weekly-dose') ;
-                $currentDose = 'current_dose_'.strtolower($product_name);
+                $current_dose_name = 'current_dose_'.strtolower($product_name);
             }
         }
 
@@ -79,6 +79,35 @@ function validate_with_external_api() {
     }
     $current_past_med_conds = !empty($current_past_med_conds_array) ? implode(', ', $current_past_med_conds_array) : 'None';
 
+    switch ($posted_data[$current_dose_name]) {
+        case 'Semaglutide 0.25mg':
+        case 'Tirzepatide 2.5mg':
+            $current_dose = 'Weightloss1';
+            break;
+        case 'Semaglutide 0.5mg':
+        case 'Tirzepatide 5mg':
+            $current_dose = 'Weightloss2';
+            break;
+        case 'Semaglutide 1mg':
+        case 'Tirzepatide 7.5mg':
+            $current_dose = 'Weightloss3';
+            break;
+        case 'Semaglutide 1.5mg':
+        case 'Semaglutide 1.7mg':
+        case 'Tirzepatide 10mg':
+            $current_dose = 'Weightloss4';
+            break;
+        case 'Semaglutide 2.5mg':
+        case 'Tirzepatide 12.5mg':
+        case 'Tirzepatide 15mg':
+            $current_dose = 'Weightloss5';
+            break;
+        
+        default:
+            // code...
+            break;
+    }
+
     $masterId = uniqid(substr($posted_data['billing_first_name'], 0, 1).substr($posted_data['billing_last_name'], 0, 1).'_');
 
     $args1 = [
@@ -99,7 +128,7 @@ function validate_with_external_api() {
                 "medicalConditions" => isset($posted_data['current_medical_conditions']) ? sanitize_text_field($posted_data['current_medical_conditions']) : '',
                 "currentWeightloss" => isset($posted_data['current_meds_sem_tirz']) ? sanitize_text_field($posted_data['current_meds_sem_tirz']) : '',
                 "weightlossPreference" => isset($posted_data['new_dose']) ? sanitize_text_field($posted_data['new_dose']) : 'N/A',
-                "currentDose" => isset($posted_data[$currentDose]) ? sanitize_text_field($posted_data[$currentDose]) : 'N/A',
+                "currentDose" => isset($current_dose) ? sanitize_text_field($current_dose) : 'N/A',
                 "patientPreference" => [
                     [
                         "name" => $product_name.' '.$weekly_dose_preference,
@@ -164,7 +193,16 @@ function validate_with_external_api() {
         if($posted_data['current_meds_side_efects'] == 'Yes') {
             $args1["formObj"]["Q".$i] = "Please describe the side effects that you've experienced";
             $args1["formObj"]["A".$i++] = isset($posted_data['current_meds_side_efects_textarea']) ? sanitize_text_field($posted_data['current_meds_side_efects_textarea']) : '';
+        }
 
+        if($posted_data['current_meds_sem_tirz']=='semaglutide') {
+            $args1["formObj"]["Q".$i] = "Which Semaglutide (Ozempic, Wegovy, Rybelsus) dose most closely matches your most recent dose? POSSIBLE ANSWERS: Semaglutide 0.25mg; Semaglutide 0.5mg; Semaglutide 1mg; Semaglutide 1.5mg; Semaglutide 1.7mg; Semaglutide 2.5mg";
+            $args1["formObj"]["A".$i++] = isset($posted_data['current_dose_semaglutide']) ? $posted_data['current_dose_semaglutide'] : '';
+        }
+
+        if($posted_data['current_meds_sem_tirz']=='tirzepatide') {
+            $args1["formObj"]["Q".$i] = "Which Tirzepatide (Zepbound, Mounjaro) dose most closely matches your most recent dose? POSSIBLE ANSWERS: Tirzepatide 2.5mg; Tirzepatide 5mg; Tirzepatide 7.5mg; Tirzepatide 10mg; Tirzepatide 12.5mg; Tirzepatide 15mg";
+            $args1["formObj"]["A".$i++] = isset($posted_data['current_dose_tirzepatide']) ? $posted_data['current_dose_tirzepatide'] : '';
         }
     }
 
