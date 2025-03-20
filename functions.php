@@ -182,11 +182,19 @@ function add_custom_variation_fields($loop, $variation_data, $variation) {
     ]);*/
 
     woocommerce_wp_text_input([
+        'id' => "medicine_medinfo_{$loop}",
+        'name' => "medicine_medinfo[{$loop}]",
+        'value' => get_post_meta($variation->ID, 'medicine_medinfo', true),
+        'label' => __('Medication Info', 'woocommerce'),
+        'wrapper_class' => 'form-row form-row-first',
+    ]);
+
+    woocommerce_wp_text_input([
         'id' => "medicine_strength_{$loop}",
         'name' => "medicine_strength[{$loop}]",
         'value' => get_post_meta($variation->ID, 'medicine_strength', true),
         'label' => __('Strength', 'woocommerce'),
-        'wrapper_class' => 'form-row form-row-first',
+        'wrapper_class' => 'form-row form-row-last',
     ]);
 
     woocommerce_wp_text_input([
@@ -194,7 +202,15 @@ function add_custom_variation_fields($loop, $variation_data, $variation) {
         'name' => "medicine_quantity[{$loop}]",
         'value' => get_post_meta($variation->ID, 'medicine_quantity', true),
         'label' => __('Quantity', 'woocommerce'),
-         'wrapper_class' => 'form-row form-row-last',
+         'wrapper_class' => 'form-row form-row-first',
+    ]);
+
+     woocommerce_wp_text_input([
+        'id' => "medicine_dispense_{$loop}",
+        'name' => "medicine_dispense[{$loop}]",
+        'value' => get_post_meta($variation->ID, 'medicine_dispense', true),
+        'label' => __('Dispense', 'woocommerce'),
+        'wrapper_class' => 'form-row form-row-last',
     ]);
    
     woocommerce_wp_text_input([
@@ -204,13 +220,21 @@ function add_custom_variation_fields($loop, $variation_data, $variation) {
         'label' => __('Refills', 'woocommerce'),
         'wrapper_class' => 'form-row form-row-first',
     ]);
+
+    woocommerce_wp_text_input([
+        'id' => "medicine_days_{$loop}",
+        'name' => "medicine_days[{$loop}]",
+        'value' => get_post_meta($variation->ID, 'medicine_days', true),
+        'label' => __('Days', 'woocommerce'),
+        'wrapper_class' => 'form-row form-row-last',
+    ]);
     
      woocommerce_wp_textarea_input([
         'id' => "medicine_sig_{$loop}",
         'name' => "medicine_sig[{$loop}]",
         'value' => get_post_meta($variation->ID, 'medicine_sig', true),
         'label' => __('Sig', 'woocommerce'),
-        'wrapper_class' => 'form-row form-row-last',
+        'wrapper_class' => 'form-row form-row-first',
 
      ]);
     
@@ -219,7 +243,7 @@ function add_custom_variation_fields($loop, $variation_data, $variation) {
         'name' => "medicine_pharmacy_notes[{$loop}]",
         'value' => get_post_meta($variation->ID, 'medicine_pharmacy_notes', true),
         'label' => __('Pharmacy Notes', 'woocommerce'),
-        'wrapper_class' => 'form-row form-row-first',
+        'wrapper_class' => 'form-row form-row-last',
     ]);
 
     woocommerce_wp_select([
@@ -235,7 +259,7 @@ function add_custom_variation_fields($loop, $variation_data, $variation) {
             'Weightloss4' => __('Weightloss4', 'woocommerce'),
             'Weightloss5' => __('Weightloss5', 'woocommerce'),
         ],
-         'wrapper_class' => 'form-row form-row-last',
+         'wrapper_class' => 'form-row form-row-first',
     ]);
 }
 
@@ -250,6 +274,9 @@ function save_custom_variation_fields($variation_id, $i) {
         'medicine_refills',
         'medicine_pharmacy_notes',
         'medicine_category',
+        'medicine_days',
+        'medicine_dispense',
+        'medicine_medinfo',
     ];
 	
     foreach ($fields as $field) {
@@ -272,6 +299,9 @@ function add_custom_variation_fields_to_cart($cart_item_data, $product_id, $vari
         'medicine_quantity',
         //'medicine_sig',
         //'medicine_refills',
+        //'medicine_days',
+        //'medicine_dispense',
+        //'medicine_medinfo',
     ];
 
     foreach ($custom_fields as $field) {
@@ -295,6 +325,9 @@ function display_custom_variation_fields_in_cart($item_data, $cart_item) {
         'custom_medicine_quantity' => __('Quantity', 'woocommerce'),
         //'custom_medicine_sig' => __('Sig', 'woocommerce'),
         //'custom_medicine_refills' => __('Refills', 'woocommerce'),
+        //'custom_medicine_days' => __('Days', 'woocommerce'),
+        //'custom_medicine_dispense' => __('Dispense', 'woocommerce'),
+        //'custom_medicine_medinfo' => __('Medication Info', 'woocommerce'),
         //'medicine_pharmacy_notes' => __('Pharmacy Notes', 'woocommerce'),
        // 'medicine_category' => __('Category', 'woocommerce'),
     ];
@@ -304,7 +337,7 @@ function display_custom_variation_fields_in_cart($item_data, $cart_item) {
         if (!empty($cart_item[$meta_key]) || $cart_item[$meta_key] == '0') {
             $item_data[] = [
                 'name'  => $label,
-                'value' => $meta_key == 'custom_medicine_quantity' ? $cart_item[$meta_key].' ml'  : $cart_item[$meta_key],
+                'value' => $meta_key == 'custom_medicine_quantity' ? $cart_item[$meta_key]  : $cart_item[$meta_key],
             ];
         }
     }
@@ -319,18 +352,21 @@ add_filter('woocommerce_available_variation', 'add_custom_fields_to_variation_fr
 function add_custom_fields_to_variation_frontend($variation_data) {
     $fields = [
         //'medicine_concentration' => 'Concentration',
-        //'medicine_strength' => 'Strength',
-        'medicine_quantity' => 'Quantity',
-        //'medicine_sig' => 'Sig',
-        //'medicine_refills' => 'Refills',
+        'medicine_medinfo' => 'Medication Info',
+        'medicine_strength' => 'Strength',
+        'medicine_quantity' => 'Quantity', 
+        'medicine_dispense' => 'Dispense',      
+        'medicine_refills' => 'Refills',
+        'medicine_days' => 'Days', 
+        'medicine_sig' => 'Sig',
         //'medicine_pharmacy_notes' => 'Pharmacy Notes',
-       // 'medicine_category' => 'Category',
+        //'medicine_category' => 'Category',
     ];
 
     foreach ($fields as $meta_key => $label) {
         $value = get_post_meta($variation_data['variation_id'], $meta_key, true);
         if (!empty($value) || $value == '0') {
-            $variation_data[$meta_key] = $meta_key == 'medicine_quantity' ? $value.' ml' : $value;
+            $variation_data[$meta_key] = $meta_key == 'medicine_quantity' ? $value : $value;
         }
     }
 
@@ -352,6 +388,9 @@ function display_custom_fields_on_product_page() {
             $('form.variations_form').on('show_variation', function (event, variation) {
                 let fieldsHtml = '';
 
+                if (variation.medicine_medinfo) {
+                    fieldsHtml += '<p><strong>Medication Info:</strong> ' + variation.medicine_medinfo + '</p>';
+                }
                 if (variation.medicine_concentration) {
                     fieldsHtml += '<p><strong>Concentration:</strong> ' + variation.medicine_concentration + '</p>';
                 }
@@ -361,12 +400,19 @@ function display_custom_fields_on_product_page() {
                 if (variation.medicine_quantity) {
                     fieldsHtml += '<p><strong>Quantity:</strong> ' + variation.medicine_quantity + '</p>';
                 }
-                if (variation.medicine_sig) {
-                    fieldsHtml += '<p><strong>Sig:</strong> ' + variation.medicine_sig + '</p>';
+                if (variation.medicine_dispense) {
+                    fieldsHtml += '<p><strong>Dispense:</strong> ' + variation.medicine_dispense + '</p>';
                 }
+                
                 if (variation.medicine_refills) {
                     fieldsHtml += '<p><strong>Refills:</strong> ' + variation.medicine_refills + '</p>';
                 }
+                 if (variation.medicine_days) {
+                    fieldsHtml += '<p><strong>Days:</strong> ' + variation.medicine_days + '</p>';
+                }
+                if (variation.medicine_sig) {
+                    fieldsHtml += '<p><strong>Sig:</strong> ' + variation.medicine_sig + '</p>';
+                }                
                 if (variation.medicine_pharmacy_notes) {
                     fieldsHtml += '<p><strong>Pharmacy Notes:</strong> ' + variation.medicine_pharmacy_notes + '</p>';
                 }
@@ -562,7 +608,7 @@ function remove_specific_states( $states ) {
 add_filter('woocommerce_get_item_data', function ($item_data, $cart_item) {
     //print_r($item_data);
     foreach ($item_data as $key => $data) {
-        if (isset($data['key']) && $data['key'] === 'Are you currently taking the medication or have you taken it in the past two months?') { // 'pa_' prefix is used for product attributes
+        if (isset($data['key']) && $data['key'] === 'Are you currently taking any GLP-1 medication or have you taken it in the past two months?') { // 'pa_' prefix is used for product attributes
             unset($item_data[$key]);        
         }
         //print_r($data);

@@ -108,6 +108,23 @@ function validate_with_external_api() {
             break;
     }
 
+
+    switch ($posted_data['new_dose']) {
+        case 'same':
+            $new_dose_text = 'Stay at the same dose or equivalent dose';
+            break;
+        case 'increase':
+            $new_dose_text = 'Increase the dose if a higher one is available, or continue with my current dose if it is already at the maximum';
+            break;
+        case 'decrease':
+            $new_dose_text = 'Decrease dose';
+            break;
+        
+        default:
+            // code...
+            break;
+    }
+    
     $masterId = uniqid(substr($posted_data['billing_first_name'], 0, 1).substr($posted_data['billing_last_name'], 0, 1).'_');
 
     $args1 = [
@@ -204,7 +221,25 @@ function validate_with_external_api() {
             $args1["formObj"]["Q".$i] = "Which Tirzepatide (Zepbound, Mounjaro) dose most closely matches your most recent dose? POSSIBLE ANSWERS: Tirzepatide 2.5mg; Tirzepatide 5mg; Tirzepatide 7.5mg; Tirzepatide 10mg; Tirzepatide 12.5mg; Tirzepatide 15mg";
             $args1["formObj"]["A".$i++] = isset($posted_data['current_dose_tirzepatide']) ? $posted_data['current_dose_tirzepatide'] : '';
         }
+
+        $args1["formObj"]["Q".$i] = "How would you like to continue your treatment? POSSIBLE ANSWERS: Stay at the same dose or equivalent dose; Increase the dose if a higher one is available, or continue with my current dose if it's already at the maximum; Decrease dose";
+        $args1["formObj"]["A".$i++] = isset($new_dose_text) ? $new_dose_text : '';
+
+
+        $args1["formObj"]["Q".$i] = "Do you have a picture of your current prescription? We need this photograph in order to validate your current dosage. POSSIBLE ANSWERS: Yes; No";
+        $args1["formObj"]["A".$i++] = isset($posted_data['current_prescription_picture_yes_no']) ? $posted_data['current_prescription_picture_yes_no'] : '';
+
+        
     }
+
+    $args1["formObj"]["Q".$i] = "What other information or questions do you have for the doctor?";
+    $args1["formObj"]["A".$i++] = isset($posted_data['other_info_questions']) ? sanitize_text_field($posted_data['other_info_questions']) : '';
+
+    $args1["formObj"]["Q".$i] = "Consent (Truthfulness): Please attest to the following confirming that all information you have provided to us is true and complete. Consent: I verify that I am the patient and that I have answered the questions asked in this intake form. I confirm that I have reviewed and understood all the questions asked of me. I attest that the answers and information I have provided in this questionnaire is true and complete to the best of my knowledge. I understand that it is critical to my health to share complete health information with my doctor. I will not hold the doctor or affiliated medical practice responsible for any oversights or omissions, whether intentional or not, in the information that I provided.";
+    $args1["formObj"]["A".$i++] = "I acknowledge that I have read and understood the above information.";
+
+    $args1["formObj"]["Q".$i] = "Consent (GLP-1 and GLP-1/GIP): Indication for Use: You are requesting treatment with a GLP-1 (Ozempic, Wegovy, or compounded semaglutide) or GIP/GLP-1 receptor agonist (Mounjaro, Zepbound, or compounded tirzepatide) medication as part of your treatment plan for the management of weight or obesity. These medications work by mimicking the action of incretin hormones, which help regulate blood sugar levels, promote feeling full, and reduce food intake. Potential Benefits:Weight loss or weight management,Improved blood glucose control,Reduced cardiovascular risk,Potential improvement in overall metabolic health. Potential Side Effects: While these medications can be beneficial, they may also cause side effects.  Although not common, these medications can result in emergency room visits, hospitalizations, or even death. Common and serious side effects include, but are not limited to Common Side Effects: Nausea,Vomiting,Diarrhea,Constipation, Decreased appetite, Indigestion. Serious Side Effects: Pancreatitis (inflammation of the pancreas), Hypoglycemia (low blood sugar) especially when used with other diabetes medications,Gallbladder disease (e.g., gallstones),Kidney problems, Allergic reactions (e.g., rash, itching, swelling), Gastroparesis (paralysis of the bowels). Risks and Considerations:  Pancreatitis: There is a risk of developing pancreatitis. If you experience severe abdominal pain, nausea, or vomiting, you should contact your healthcare provider immediately. Thyroid Tumors: Animal studies have shown an increased risk of thyroid tumors with certain GLP-1 medications. Although this has not been confirmed in humans, please inform your healthcare provider if you have a history of thyroid cancer. Hypoglycemia: When taken with other diabetes medications, particularly insulin or sulfonylureas, there is a risk of low blood sugar. It is important that your provider knows if any of these medications are added to your regimen. Kidney Function: This medication may affect kidney function, particularly in patients with existing kidney disease. Regular monitoring of kidney function may be required. Monitoring and Follow-up: You will require regular follow-up visits to monitor your response to the medication and to assess for any side effects. We may intermittently ask for full-body selfie images to ensure that your reported weight is consistent. I acknowledge the potential benefits, risks, and side effects of GLP-1 or GIP/GLP-1 receptor agonist medications. I understand the importance of regular monitoring and follow-up appointments. I consent to the use of GLP-1 or GIP/GLP-1 receptor agonist medications as part of my treatment plan for overweight or obesity.";
+    $args1["formObj"]["A".$i++] = "I acknowledge that I have read and understood the above information.";
 
        write_log($args1); 
       wc_add_notice('Your order could not be processed. Please check your details and try again.', 'error');
