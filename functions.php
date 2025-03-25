@@ -496,19 +496,23 @@ function woocommerce_checkout_scripts() {
             }
 			break;
   		}
-		$current_med_use_input_id = $current_med_use == 'yes' ? 'current_meds_sem_tirz_'.$product_name : 'current_meds_sem_tirz_neither';
+		//$current_med_use_input_id = $current_med_use == 'yes' ? '#current_meds_sem_tirz_'.$product_name : '#current_meds_sem_tirz_neither';
+        $current_med_use_input_id = $current_med_use == 'yes' ? '#current_meds_sem_tirz_semaglutide,#current_meds_sem_tirz_tirzepatide' : '#current_meds_sem_tirz_neither';
 
-		//echo $product_name;
-		//echo $current_med_use;
-		
+				
     ?>
 		<script type="text/javascript">
 			
 		jQuery( document ).ready(function( $ ) {  
 			$('#bmi').attr('readonly', true);
-			$('#current_meds_sem_tirz_field input:not(#<?php echo  $current_med_use_input_id ?>)').attr('disabled', true);	
-			$('#current_meds_sem_tirz_field input:not(#<?php echo  $current_med_use_input_id ?>)').css('display', 'none');	
-			$('#current_meds_sem_tirz_field label:not(label[for="<?php echo  $current_med_use_input_id ?>"]):not(label[for="current_meds_sem_tirz_0"])').hide();
+			//$('#current_meds_sem_tirz_field input:not(<?php echo  $current_med_use_input_id ?>)').attr('disabled', true);	
+			//$('#current_meds_sem_tirz_field input:not(<?php echo  $current_med_use_input_id ?>)').css('display', 'none');			
+            <?php if($current_med_use == 'yes') { ?>
+                    //$('#current_meds_sem_tirz_field label[for="current_meds_sem_tirz_neither"]').hide();
+            <?php } 
+                  else { ?>
+                   //$('#current_meds_sem_tirz_field label:not(label[for="<?php echo  $current_med_use_input_id ?>"]):not(label[for="current_meds_sem_tirz_0"])').hide();
+                  <?php } ?>
             $('#condition_noneoftheabove').change(function() {
               if(this.checked) $('input[name^="condition_"]').not(this).prop('checked',false).trigger('change');
             });
@@ -548,7 +552,7 @@ function woocommerce_checkout_scripts() {
 		window.onload = function(){
 			setTimeout(function() {
 				jQuery('input[name^="condition_"]').prop('checked',false).trigger('change');
-				jQuery('#<?php echo  $current_med_use_input_id ?>').click().trigger('change');
+				//jQuery('#<?php echo  $current_med_use_input_id ?>').click().trigger('change');
 			}, 2000 );
 			
 			// Select the element to observe
