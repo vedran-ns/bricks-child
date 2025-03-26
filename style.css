@@ -22,7 +22,7 @@ form.woocommerce-checkout.bricks-default-checkout {
 .woocommerce-checkout .woocommerce-additional-fields__field-wrapper label {
   	font-weight: 400;
 }
-#id_photo_field, #full_body_image_field, #current_meds_side_efects_textarea_field, #prescription_picture_field, #selected_medical_conditions_field, #current_medical_conditions_field, #current_medications_list_dosages_field, #id_photo_content_field, #full_body_image_content_field, #consent_glp1_gip_content_field {
+#id_photo_field, #full_body_image_field, #current_meds_side_efects_textarea_field, #prescription_picture_field, #selected_medical_conditions_field, #current_medical_conditions_field, #current_medications_list_dosages_field, #current_allergies_list_field, #id_photo_content_field, #full_body_image_content_field, #consent_glp1_gip_content_field {
 	border: 1px solid rgba(128, 128, 128, 0.47);
 	padding: 12px;
 	margin: revert;

@@ -28,7 +28,36 @@ function validate_with_external_api() {
         $product_name = $parent_product->get_title();
 
         if( $item['variation_id'] > 0 ){
-            $variation_id = !empty($posted_data['prescription_picture']) ? $item['variation_id'] : ($product_name == 'Semaglutide' ? 1630 : 1649); // Variation product            
+            if( !empty($posted_data['prescription_picture']) ) {
+                $variation_id = $item['variation_id'];
+            }
+            else{
+                switch ($product_name) {
+                    case 'Semaglutide':
+                        $variation_id = 1630;
+                        break;
+                    case 'Tirzepatide':
+                        $variation_id = 1649;
+                        break;
+                    case 'Mounjaro':
+                        $variation_id = 1918;
+                        break;
+                    case 'Ozempic':
+                        $variation_id = 1944;
+                        break;
+                    case 'Wegovy':
+                        $variation_id = 1954;
+                        break;
+                    case 'Zepbound':
+                        $variation_id = 1964;
+                        break;
+                    default:
+                        // code...
+                        break;
+                }
+                //$variation_id = !empty($posted_data['prescription_picture']) ? $item['variation_id'] : ($product_name == 'Semaglutide' ? 1630 : 1649); // Variation product  
+            }
+                      
         } else {            
             $variation_id = 0;
         }
@@ -55,8 +84,10 @@ function validate_with_external_api() {
 
                 // Variation attributes
                 $current_med_use = $variation->get_attribute('pa_current-medication-use');
-                $weekly_dose_preference =  $variation->get_attribute('pa_weekly-dose') ;
-                $current_dose_name = 'current_dose_'.strtolower($product_name);
+                $weekly_dose_preference =  $variation->get_attribute('pa_dose') ;
+                //$current_dose_name = 'current_dose_'.strtolower($product_name);
+                $current_dose_name = isset($posted_data['current_meds_sem_tirz']) && $posted_data['current_meds_sem_tirz']=='semaglutide' ? 'current_dose_semaglutide' : (isset($posted_data['current_meds_sem_tirz']) && $posted_data['current_meds_sem_tirz']=='tirzepatide' ? 'current_dose_tirzepatide' : '');
+                
             }
         }
 
@@ -94,6 +125,7 @@ function validate_with_external_api() {
             break;
         case 'Semaglutide 1.5mg':
         case 'Semaglutide 1.7mg':
+        case 'Semaglutide 2mg':
         case 'Tirzepatide 10mg':
             $current_dose = 'Weightloss4';
             break;
@@ -213,7 +245,7 @@ function validate_with_external_api() {
         }
 
         if($posted_data['current_meds_sem_tirz']=='semaglutide') {
-            $args1["formObj"]["Q".$i] = "Which Semaglutide (Ozempic, Wegovy, Rybelsus) dose most closely matches your most recent dose? POSSIBLE ANSWERS: Semaglutide 0.25mg; Semaglutide 0.5mg; Semaglutide 1mg; Semaglutide 1.5mg; Semaglutide 1.7mg; Semaglutide 2.5mg";
+            $args1["formObj"]["Q".$i] = "Which Semaglutide (Ozempic, Wegovy, Rybelsus) dose most closely matches your most recent dose? POSSIBLE ANSWERS: Semaglutide 0.25mg; Semaglutide 0.5mg; Semaglutide 1mg; Semaglutide 1.5mg; Semaglutide 1.7mg; Semaglutide 2mg; Semaglutide 2.5mg";
             $args1["formObj"]["A".$i++] = isset($posted_data['current_dose_semaglutide']) ? $posted_data['current_dose_semaglutide'] : '';
         }
 
@@ -241,10 +273,10 @@ function validate_with_external_api() {
     $args1["formObj"]["Q".$i] = "Consent (GLP-1 and GLP-1/GIP): Indication for Use: You are requesting treatment with a GLP-1 (Ozempic, Wegovy, or compounded semaglutide) or GIP/GLP-1 receptor agonist (Mounjaro, Zepbound, or compounded tirzepatide) medication as part of your treatment plan for the management of weight or obesity. These medications work by mimicking the action of incretin hormones, which help regulate blood sugar levels, promote feeling full, and reduce food intake. Potential Benefits:Weight loss or weight management,Improved blood glucose control,Reduced cardiovascular risk,Potential improvement in overall metabolic health. Potential Side Effects: While these medications can be beneficial, they may also cause side effects.  Although not common, these medications can result in emergency room visits, hospitalizations, or even death. Common and serious side effects include, but are not limited to Common Side Effects: Nausea,Vomiting,Diarrhea,Constipation, Decreased appetite, Indigestion. Serious Side Effects: Pancreatitis (inflammation of the pancreas), Hypoglycemia (low blood sugar) especially when used with other diabetes medications,Gallbladder disease (e.g., gallstones),Kidney problems, Allergic reactions (e.g., rash, itching, swelling), Gastroparesis (paralysis of the bowels). Risks and Considerations:  Pancreatitis: There is a risk of developing pancreatitis. If you experience severe abdominal pain, nausea, or vomiting, you should contact your healthcare provider immediately. Thyroid Tumors: Animal studies have shown an increased risk of thyroid tumors with certain GLP-1 medications. Although this has not been confirmed in humans, please inform your healthcare provider if you have a history of thyroid cancer. Hypoglycemia: When taken with other diabetes medications, particularly insulin or sulfonylureas, there is a risk of low blood sugar. It is important that your provider knows if any of these medications are added to your regimen. Kidney Function: This medication may affect kidney function, particularly in patients with existing kidney disease. Regular monitoring of kidney function may be required. Monitoring and Follow-up: You will require regular follow-up visits to monitor your response to the medication and to assess for any side effects. We may intermittently ask for full-body selfie images to ensure that your reported weight is consistent. I acknowledge the potential benefits, risks, and side effects of GLP-1 or GIP/GLP-1 receptor agonist medications. I understand the importance of regular monitoring and follow-up appointments. I consent to the use of GLP-1 or GIP/GLP-1 receptor agonist medications as part of my treatment plan for overweight or obesity.";
     $args1["formObj"]["A".$i++] = "I acknowledge that I have read and understood the above information.";
 
-       write_log($args1); 
-      wc_add_notice('Your order could not be processed. Please check your details and try again.', 'error');
+      // write_log($args1); 
+      //wc_add_notice('Your order could not be processed. Please check your details and try again.', 'error');
 
-    /*$response = wp_remote_post( 'https://api-staging.belugahealth.com/visit/createNoPayPhotos', 
+    $response = wp_remote_post( 'https://api-staging.belugahealth.com/visit/createNoPayPhotos', 
         array(
           'method' => 'POST',
           'httpversion' => '1.0',
@@ -288,7 +320,7 @@ function validate_with_external_api() {
             WC()->session->set('responseVisitInfo', $response_data['info']);           
             WC()->session->set('payloadData', $args1);
         }
-            
+         write_log($args1);   
 
 
         $image_fields = [];
@@ -342,11 +374,9 @@ function validate_with_external_api() {
         }
 
     
-    }*/
-
-    
-    
-    //wc_add_notice('Your order could not be processed. Please check your details and try again.', 'error');
+    }
+     
+   
 }
 
 
@@ -430,15 +460,32 @@ function order_post($data){
 }
 
 
-function write_log($log) {
-        if (true === WP_DEBUG) {
-            if (is_array($log) || is_object($log)) {
+//write log function created by using error_log and woocommerce function wc_get_logger()
+if (! function_exists('write_log')) {
+                
+    function write_log($log)  {
+        
+        if (is_array($log) || is_object($log)) {
+            if ( function_exists('error_log') && true === WP_DEBUG) {
                 error_log(print_r($log, true));
-            } else {
+            }
+            if (function_exists('wc_get_logger')) {
+                wc_get_logger()->info(wc_print_r($log, true), array( 'source' => 'custom-log' ));
+            }
+        } else {
+            if ( function_exists('error_log') && true === WP_DEBUG) {
                 error_log($log);
             }
+            if (function_exists('wc_get_logger')) {
+                wc_get_logger()->info($log, array( 'source' => 'custom-log' ));
+            }
+            
         }
+        
     }
+}
+
+
 
 function compress_resize_encode_images($image_fields,$posted_data) {
     

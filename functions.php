@@ -445,14 +445,14 @@ function limit_cart_to_one_product($passed, $product_id) {
          if( has_term( 'glp-1', 'product_cat', $product_id ) ) {     
             // Empty the cart
             $cart->empty_cart();
-            wc_add_notice(__('Your cart has been updated to only allow one GLP-1 medication at a time.', 'woocommerce'), 'notice');
+            wc_add_notice(__('Your cart has been updated to only allow one GLP-1 weight loss medication at a time.', 'woocommerce'), 'notice');
         }
         else {
             foreach ($cart->get_cart() as $cart_item_key => $cart_item) {             
                 //if(in_array($cart_item['data']->name, ['Semaglutide','Tirzepatide']))  {    
                 if( has_term( 'glp-1', 'product_cat', $cart_item['product_id'] ) ) {                           
                     $cart->remove_cart_item($cart_item_key); 
-                    wc_add_notice(sprintf(__('Your cart has been updated. GLP-1 medication (%s) has been removed from the cart.', 'woocommerce') , $cart_item['data']->name ), 'notice');
+                    wc_add_notice(sprintf(__('Your cart has been updated. GLP-1 weight loss medication (%s) has been removed from the cart.', 'woocommerce') , $cart_item['data']->name ), 'notice');
                     break;     
                 }  
             }
@@ -470,7 +470,7 @@ function first_order_add_bag() {
             //if(in_array($cart_item['data']->name, ['Semaglutide','Tirzepatide']))  {    
             if( has_term( 'glp-1', 'product_cat', $cart_item['product_id'] ) ) {                           
                 WC()->cart->remove_cart_item($cart_item_key);       
-                wc_add_notice(__('Your cart has been updated to only allow one GLP-1 medication at a time.', 'woocommerce'), 'notice');
+                wc_add_notice(__('Your cart has been updated to only allow one GLP-1 weight loss medication at a time.', 'woocommerce'), 'notice');
                 break;     
             }  
         }
@@ -505,13 +505,13 @@ function woocommerce_checkout_scripts() {
 			
 		jQuery( document ).ready(function( $ ) {  
 			$('#bmi').attr('readonly', true);
-			//$('#current_meds_sem_tirz_field input:not(<?php echo  $current_med_use_input_id ?>)').attr('disabled', true);	
-			//$('#current_meds_sem_tirz_field input:not(<?php echo  $current_med_use_input_id ?>)').css('display', 'none');			
+			//$('#current_meds_sem_tirz_field input:not(<?php //echo  $current_med_use_input_id ?>)').attr('disabled', true);	
+			//$('#current_meds_sem_tirz_field input:not(<?php //echo  $current_med_use_input_id ?>)').css('display', 'none');			
             <?php if($current_med_use == 'yes') { ?>
                     //$('#current_meds_sem_tirz_field label[for="current_meds_sem_tirz_neither"]').hide();
             <?php } 
                   else { ?>
-                   //$('#current_meds_sem_tirz_field label:not(label[for="<?php echo  $current_med_use_input_id ?>"]):not(label[for="current_meds_sem_tirz_0"])').hide();
+                   //$('#current_meds_sem_tirz_field label:not(label[for="<?php //echo  $current_med_use_input_id ?>"]):not(label[for="current_meds_sem_tirz_0"])').hide();
                   <?php } ?>
             $('#condition_noneoftheabove').change(function() {
               if(this.checked) $('input[name^="condition_"]').not(this).prop('checked',false).trigger('change');
@@ -612,7 +612,7 @@ function remove_specific_states( $states ) {
 add_filter('woocommerce_get_item_data', function ($item_data, $cart_item) {
     //print_r($item_data);
     foreach ($item_data as $key => $data) {
-        if (isset($data['key']) && $data['key'] === 'Are you currently taking any GLP-1 medication or have you taken it in the past two months?') { // 'pa_' prefix is used for product attributes
+        if (isset($data['key']) && $data['key'] === 'Are you currently taking any GLP-1 weight loss medication or have you taken it in the past two months?') { // 'pa_' prefix is used for product attributes
             unset($item_data[$key]);        
         }
         //print_r($data);
