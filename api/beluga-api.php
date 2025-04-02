@@ -265,7 +265,7 @@ function validate_with_external_api() {
     }
 
     $args1["formObj"]["Q".$i] = "What other information or questions do you have for the doctor?";
-    $args1["formObj"]["A".$i++] = isset($posted_data['other_info_questions']) ? sanitize_text_field($posted_data['other_info_questions']) : '';
+    $args1["formObj"]["A".$i++] = isset($posted_data['other_info_questions']) ? sanitize_text_field($posted_data['other_info_questions']) : 'N/A';
 
     $args1["formObj"]["Q".$i] = "Consent (Truthfulness): Please attest to the following confirming that all information you have provided to us is true and complete. Consent: I verify that I am the patient and that I have answered the questions asked in this intake form. I confirm that I have reviewed and understood all the questions asked of me. I attest that the answers and information I have provided in this questionnaire is true and complete to the best of my knowledge. I understand that it is critical to my health to share complete health information with my doctor. I will not hold the doctor or affiliated medical practice responsible for any oversights or omissions, whether intentional or not, in the information that I provided.";
     $args1["formObj"]["A".$i++] = "I acknowledge that I have read and understood the above information.";
@@ -273,7 +273,7 @@ function validate_with_external_api() {
     $args1["formObj"]["Q".$i] = "Consent (GLP-1 and GLP-1/GIP): Indication for Use: You are requesting treatment with a GLP-1 (Ozempic, Wegovy, or compounded semaglutide) or GIP/GLP-1 receptor agonist (Mounjaro, Zepbound, or compounded tirzepatide) medication as part of your treatment plan for the management of weight or obesity. These medications work by mimicking the action of incretin hormones, which help regulate blood sugar levels, promote feeling full, and reduce food intake. Potential Benefits:Weight loss or weight management,Improved blood glucose control,Reduced cardiovascular risk,Potential improvement in overall metabolic health. Potential Side Effects: While these medications can be beneficial, they may also cause side effects.  Although not common, these medications can result in emergency room visits, hospitalizations, or even death. Common and serious side effects include, but are not limited to Common Side Effects: Nausea,Vomiting,Diarrhea,Constipation, Decreased appetite, Indigestion. Serious Side Effects: Pancreatitis (inflammation of the pancreas), Hypoglycemia (low blood sugar) especially when used with other diabetes medications,Gallbladder disease (e.g., gallstones),Kidney problems, Allergic reactions (e.g., rash, itching, swelling), Gastroparesis (paralysis of the bowels). Risks and Considerations:  Pancreatitis: There is a risk of developing pancreatitis. If you experience severe abdominal pain, nausea, or vomiting, you should contact your healthcare provider immediately. Thyroid Tumors: Animal studies have shown an increased risk of thyroid tumors with certain GLP-1 medications. Although this has not been confirmed in humans, please inform your healthcare provider if you have a history of thyroid cancer. Hypoglycemia: When taken with other diabetes medications, particularly insulin or sulfonylureas, there is a risk of low blood sugar. It is important that your provider knows if any of these medications are added to your regimen. Kidney Function: This medication may affect kidney function, particularly in patients with existing kidney disease. Regular monitoring of kidney function may be required. Monitoring and Follow-up: You will require regular follow-up visits to monitor your response to the medication and to assess for any side effects. We may intermittently ask for full-body selfie images to ensure that your reported weight is consistent. I acknowledge the potential benefits, risks, and side effects of GLP-1 or GIP/GLP-1 receptor agonist medications. I understand the importance of regular monitoring and follow-up appointments. I consent to the use of GLP-1 or GIP/GLP-1 receptor agonist medications as part of my treatment plan for overweight or obesity.";
     $args1["formObj"]["A".$i++] = "I acknowledge that I have read and understood the above information.";
 
-      // write_log($args1); 
+       write_log($args1); 
       //wc_add_notice('Your order could not be processed. Please check your details and try again.', 'error');
 
     $response = wp_remote_post( 'https://api-staging.belugahealth.com/visit/createNoPayPhotos', 
@@ -407,57 +407,186 @@ function validate_with_external_api_b($order_id, $posted_data, $order) {
 
 
 
-/* Custom Api Endpoint */
+//Registers a custom REST API endpoint for handling Beluga visit events.
+add_action( 'rest_api_init', 'custom_api' );
 
-add_action('rest_api_init', 'custom_api');
-
-function custom_api(){
-    
-    register_rest_route( 'order', 'ordering_status', array( 
-      'methods' => 'POST',
-      'callback' => 'order_post'
-     ));
+function custom_api() {
+    register_rest_route( 'beluga/visit', 'response', array(
+        'methods'  => 'POST',
+        'callback' => 'handle_visit_response',
+        //'args'     => prefix_get_visit_arguments(),
+    ) );
 }
 
-function order_post($data){
-//    var_dump($data->get_headers());exit;
-   $token_ = $data->get_header("authorisation"); // should be sent as Authorisation in header (rewrite is done in .htaccess)
-
-//    var_dump(substr($token_, 0, 13));exit;
-
-//    if(is_null($token_) || base64_decode(substr($token_, 0, -5)) != "ApiAccess2019"){
-   if(is_null($token_) || $token_ !== "Token ababababababab"){
-
-        return 'Access denied';
-        exit;
+function handle_visit_response( $data ) {
+    // Validate the Authorisation header 
+    $auth_header = $data->get_header("authorization");
+    if (empty($auth_header) || $auth_header !== WEBHOOK_TOKEN) {        
+        return new WP_REST_Response( array('status' => 403, 'error'   => 'Access denied',), 403 );
     }
-    elseif(isset($data['order_id']) && isset($data['shipper']) && isset($data['tracking_number']) && isset($data['ship_date'])){
-        /*wp_insert_post(
-            array(
-                'post_type' => 'ordering',
-                'post_status' => 'publish',
-                'post_title' => sanitize_text_field($data['order_id']),
-                'meta_input' => array(
-                  'shipper' =>sanitize_text_field($data['shipper']),
-                  'tracking_number' =>sanitize_text_field($data['tracking_number']),
-                  'ship_date' =>sanitize_text_field($data['ship_date'])
-                )
-            )
-        );*/
 
-        
-    $product =  wc_get_order($data['order_id']);
-    $email = $product->get_billing_email();
+    // Retrieve JSON parameters from the request body.
+    $params = $data->get_json_params();
+
+    // Ensure masterId and event are provided.
+    if ( empty( $params['masterId'] ) || empty( $params['event'] ) ) {       
+        return new WP_REST_Response( array('status' => 400, 'error'   => 'masterId and event are required',), 200 );
+    }
     
-      
-    send_email($email,$data['shipper'],  $data['tracking_number'], $data['ship_date']);
+    // Check if the submitted masterId exists in any WooCommerce order. it will query either legacy posts or HPOS tables depending on WooCommerce settings.
+   $order_ids = wc_get_orders( array(
+    'limit'      => 1,
+    'meta_key'   => 'api_masterid',
+    'meta_value' => $params['masterId'],
+    ) );
 
+    if ( empty( $order_ids ) ) {
+        return new WP_REST_Response( array('status' => 400, 'error'   => 'masterId does not exist',), 200 );
 
-    return '200';
-    }else{
-        return 'All field must be filed';
     }
+
+    $order = $order_ids[0]; // This is a WC_Order object
+
+
+    // Conditional validations based on the event type.
+    switch ( $params['event'] ) {
+        case 'CONSULT_CONCLUDED':
+            if ( empty( $params['visitOutcome'] ) || ! in_array( $params['visitOutcome'], array( 'prescribed', 'referred' ) ) ) {               
+                return new WP_REST_Response( array('status' => 400, 'error'   => 'Invalid or missing visitOutcome for CONSULT_CONCLUDED event',), 200 );
+            }
+            break;
+
+        case 'RX_WRITTEN':
+            if ( empty( $params['docName'] ) ) {               
+                return new WP_REST_Response( array('status' => 400, 'error'   => 'Missing docName for RX_WRITTEN event',), 200 );
+
+            }
+            if ( empty( $params['medsPrescribed'] ) || ! is_array( $params['medsPrescribed'] ) ) {               
+                return new WP_REST_Response( array('status' => 400, 'error'   => 'medsPrescribed must be a non-empty array for RX_WRITTEN event',), 200 );
+
+            }
+            // Validate each item in medsPrescribed.
+            foreach ( $params['medsPrescribed'] as $index => $med ) {
+                $required_fields = array( 'name', 'strength', 'refills', 'quantity', 'medId', 'rxId' );
+                foreach ( $required_fields as $field ) {
+                    if ( ! isset( $med[ $field ] ) || empty( $med[ $field ] && $med[ $field ] != 0  ) ) {                        
+                        return new WP_REST_Response( array('status' => 400, 'error'   => sprintf( 'Field %s is required for item %d in medsPrescribed', $field, $index ),), 200 );
+                    }
+                }
+            }
+            break;
+
+        case 'CONSULT_CANCELED':
+        case 'DOCTOR_CHAT':
+            // No extra fields required for these events.
+            break;
+
+        default:           
+            return new WP_REST_Response( array('status' => 400, 'error'   => 'Invalid event type',), 200 );
+    }
+
+    // Process the data as needed (e.g., store it, trigger other processes, etc.).
+    // For demonstration, we return a success response.  
+    return new WP_REST_Response( array('status' => 200, 'info'   => 'Successfully received data',), 200 );
+
 }
+
+function prefix_get_visit_arguments() {
+    $args = array();
+
+    // masterId parameter.
+    $args['masterId'] = array(
+        'description'       => esc_html__( 'The masterId is used to match a Sosothin order.', 'sosothin' ),
+        'type'              => 'string',
+        'required'          => true,
+        'validate_callback' => function( $value, $request, $param ) {
+            if ( ! is_string( $value ) ) {
+                //return new WP_Error( 'rest_invalid_param', esc_html__( 'The masterId argument must be a string.', 'sosothin' ), array( 'status' => 400 ) );
+                return new WP_REST_Response( array('status' => 400, 'error'   => 'The masterId argument must be a string',), 200 );
+            }
+            return true;
+        },
+        'sanitize_callback' => 'sanitize_text_field',
+    );
+
+    // event parameter.
+    $args['event'] = array(
+        'description'       => esc_html__( 'The event parameter to define the type of operation.', 'sosothin' ),
+        'type'              => 'string',
+        'required'          => true,
+        'enum'              => array( 'CONSULT_CANCELED', 'RX_WRITTEN', 'CONSULT_CONCLUDED', 'DOCTOR_CHAT' ),
+        'validate_callback' => function( $value, $request, $param ) {
+            if ( ! is_string( $value ) ) {
+                //return new WP_Error( 'rest_invalid_param', esc_html__( 'The event argument must be a string.', 'sosothin' ), array( 'status' => 400 ) );
+                return new WP_REST_Response( array('status' => 400, 'error'   => 'The event argument must be a string',), 200 );
+            }
+            $attributes = $request->get_attributes();
+            $args = $attributes['args'][ $param ];
+            if ( ! in_array( $value, $args['enum'], true ) ) {
+                //return new WP_Error( 'rest_invalid_param', sprintf( esc_html__( '%s is not one of %s', 'sosothin' ), $param, implode( ', ', $args['enum'] ) ), array( 'status' => 400 ) );
+                return new WP_REST_Response( array('status' => 400, 'error'   => 'Invalid event type',), 200 );
+
+            }
+            return true;
+        },
+    );
+
+    // visitOutcome parameter (for CONSULT_CONCLUDED event).
+    $args['visitOutcome'] = array(
+        'description'       => esc_html__( 'Visit outcome for CONSULT_CONCLUDED event', 'sosothin' ),
+        'type'              => 'string',
+        'required'          => false,
+        'enum'              => array( 'prescribed', 'referred' ),
+        'sanitize_callback' => 'sanitize_text_field',
+    );
+
+    // docName parameter (for RX_WRITTEN event).
+    $args['docName'] = array(
+        'description'       => esc_html__( 'Doctor name for RX_WRITTEN event', 'sosothin' ),
+        'type'              => 'string',
+        'required'          => false,
+        'sanitize_callback' => 'sanitize_text_field',
+    );
+
+    // medsPrescribed parameter (for RX_WRITTEN event).
+    $args['medsPrescribed'] = array(
+        'description'       => esc_html__( 'List of prescribed meds', 'sosothin' ),
+        'type'              => 'array',
+        'required'          => false,
+        'validate_callback' => function( $value, $request, $param ) {
+            if ( ! is_array( $value ) ) {
+                return new WP_Error( 'rest_invalid_param', esc_html__( 'medsPrescribed must be an array.', 'sosothin' ), array( 'status' => 400 ) );
+            }
+            foreach ( $value as $index => $med ) {
+                $required_fields = array( 'name', 'strength', 'refills', 'quantity', 'medId', 'rxId' );
+                foreach ( $required_fields as $field ) {
+                    if ( ! isset( $med[ $field ] ) || (empty( $med[ $field ] ) && $med[ $field ] != 0  ) ) {
+                        return new WP_Error( 'rest_invalid_param', sprintf( esc_html__( 'Field %s is required for item %d in medsPrescribed', 'sosothin' ), $field, $index ), array( 'status' => 400 ) );
+                    }
+                }
+            }
+            return true;
+        },
+        'items'             => array(
+            'type'       => 'object',
+            'properties' => array(
+                'name'     => array( 'type' => 'string' ),
+                'strength' => array( 'type' => 'string' ),
+                'refills'  => array( 'type' => 'string' ),
+                'quantity' => array( 'type' => 'string' ),
+                'medId'    => array( 'type' => 'string' ),
+                'rxId'     => array( 'type' => 'string' ),
+            ),
+        ),
+    );
+
+    return $args;
+}
+
+
+
+
+
 
 
 //write log function created by using error_log and woocommerce function wc_get_logger()
