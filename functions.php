@@ -657,7 +657,10 @@ add_filter('site_transient_update_plugins', function ($transient) {
 
 add_action( 'woocommerce_email_customer_details', 'add_beluga_api_response_messages', 10, 4 );
 function add_beluga_api_response_messages( $order, $sent_to_admin, $plain_text, $email ) {
-    echo '<p>(Beluga Health message): '.$order->get_meta('api_response_visit_info').'. '. $order->get_meta('api_response_images_info').'.</p>';        
+    if ( $email->id == 'customer_on_hold_order' || $email->id == 'customer_processing_order' || $email->id == 'new_order' ) {
+        //echo '<p>(Beluga Health message): '.$order->get_meta('api_response_visit_info').'. '. $order->get_meta('api_response_images_info').'.</p>'; 
+        printf( __( '<p>(Beluga Health message): %s. %s</p><p style="font-size:13px;">Send a message to the doctor via the <a href="%s">order details page.</a></p>', 'sosothin' ), $order->get_meta('api_response_visit_info'),$order->get_meta('api_response_images_info'),$order->get_view_order_url() ) ;  
+    }   
 }
 
 

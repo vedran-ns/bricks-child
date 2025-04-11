@@ -40,6 +40,32 @@ form.woocommerce-checkout.bricks-default-checkout {
 #bmi_field, #inches_field {
 	  margin-bottom: 40px;
 }
+.woocommerce-OrderUpdate-text.comment-text {
+  	margin-bottom: 20px;
+}
+.woocommerce-OrderUpdate-description.description {
+  	border: 2px solid #a48b04;
+  	padding: 15px;
+		border-radius: 10px;
+}
+.doctor-chat-form {
+	  padding: 15px;
+	  border: 1px solid;
+	  border-radius: 10px;
+	  margin: 30px 0;
+}
+.doctor-chat-form .bricks-button {
+	  padding: 13px;
+	  font-size: 19px !important;
+	  line-height: 4px !important;
+	  margin-top: 10px;
+}
+.label-img-on {
+  	margin: 10px 0;
+}
+.hide-on-front {
+  	display: none;
+}
 @media (min-width: 991px) {
 	.woocommerce-additional-fields__field-wrapper .form-row-first, .woocommerce-additional-fields__field-wrapper .form-row-last {
 		  height: 39px;

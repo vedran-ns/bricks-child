@@ -235,6 +235,11 @@ function validate_with_external_api() {
     $args1["formObj"]["Q".$i] = "Are you currently, or have you in the past two months, taken any GLP-1 medications? POSSIBLE ANSWERS: Semaglutide (Ozempic, Wegovy, Rybelsus); Tirzepatide (Zepbound, Mounjaro);None of these";
     $args1["formObj"]["A".$i++] = isset($posted_data['current_meds_sem_tirz']) ? ( $posted_data['current_meds_sem_tirz']=='semaglutide' ? 'Semaglutide (Ozempic, Wegovy, Rybelsus) ' : ( $posted_data['current_meds_sem_tirz']=='tirzepatide' ? 'Tirzepatide (Zepbound, Mounjaro) ' : 'None of these' ) ) : '';
 
+    if($posted_data['current_meds_sem_tirz']=='neither') {
+        $args1["formObj"]["Q".$i] = "People have different sensitivities to medications and commonly experience side effects to standard dosing regimens. Do you commonly experience side effects to medications or feel like you're sensitive to the impacts of most medications? POSSIBLE ANSWERS: Yes; No";
+        $args1["formObj"]["A".$i++] = isset($posted_data['commonly_side_effects']) ? $posted_data['commonly_side_effects'] : '';
+    }
+
     if($posted_data['current_meds_sem_tirz']=='semaglutide' || $posted_data['current_meds_sem_tirz']=='tirzepatide' ) {
         $args1["formObj"]["Q".$i] = "Have you experienced side effects from your current medication? POSSIBLE ANSWERS: Yes; No";
         $args1["formObj"]["A".$i++] = isset($posted_data['current_meds_side_efects']) ? $posted_data['current_meds_side_efects'] : '';
@@ -291,13 +296,13 @@ function validate_with_external_api() {
 
      // Handle API response
     if (is_wp_error($response)) {
-        $error_message = 'There was an error connecting to the validation service. Please try again. ('.$response_data['error'].')';
+        $error_message = 'There was an error connecting to the health service. Please try again.';
     } else {
         $response_code = wp_remote_retrieve_response_code($response);
         $response_body = wp_remote_retrieve_body($response);
         $response_data = json_decode($response_body, true);
 
-        if ($response_code !== 200 || !isset($response_data['data']['masterId'], $response_data['data']['visitId'])) {
+        if ( ($response_code !== 200 || $response_data['status'] !== 200) || !isset($response_data['data']['masterId'], $response_data['data']['visitId'])) {
             $error_message = 'Your order could not be processed. Please check your details and try again. ('.$response_data['error'].')';
         }
     }
@@ -317,7 +322,7 @@ function validate_with_external_api() {
         if (WC()->session) {
             WC()->session->set('masterId', $response_data['data']['masterId']); 
             WC()->session->set('visitId', $response_data['data']['visitId']); 
-            WC()->session->set('responseVisitInfo', $response_data['info']);           
+            WC()->session->set('responseVisitInfo', strtoupper($response_data['info']));           
             WC()->session->set('payloadData', $args1);
         }
          write_log($args1);   
@@ -365,12 +370,12 @@ function validate_with_external_api() {
         
         if (is_wp_error($response2)) {
              if (WC()->session)         
-                WC()->session->set('responseImagesInfo', "Error sending images.");            
+                WC()->session->set('responseImagesInfo', "ERROR SENDING IMAGES.");            
         } else {        
             $response_body2 = wp_remote_retrieve_body($response2);
             $response_data2 = json_decode($response_body2, true);
             if (WC()->session) 
-                WC()->session->set('responseImagesInfo', $response_data2['info']);      
+                WC()->session->set('responseImagesInfo', strtoupper($response_data2['info']));      
         }
 
     
@@ -414,6 +419,7 @@ function custom_api() {
     register_rest_route( 'beluga/visit', 'response', array(
         'methods'  => 'POST',
         'callback' => 'handle_visit_response',
+        'permission_callback' => '__return_true',
         //'args'     => prefix_get_visit_arguments(),
     ) );
 }
@@ -421,7 +427,7 @@ function custom_api() {
 function handle_visit_response( $data ) {
     // Validate the Authorisation header 
     $auth_header = $data->get_header("authorization");
-    if (empty($auth_header) || $auth_header !== WEBHOOK_TOKEN) {        
+    if (empty($auth_header) || $auth_header !== 'Bearer qgwQVLGyfTskZgWcakkk') {        
         return new WP_REST_Response( array('status' => 403, 'error'   => 'Access denied',), 403 );
     }
 
@@ -436,7 +442,7 @@ function handle_visit_response( $data ) {
     // Check if the submitted masterId exists in any WooCommerce order. it will query either legacy posts or HPOS tables depending on WooCommerce settings.
    $order_ids = wc_get_orders( array(
     'limit'      => 1,
-    'meta_key'   => 'api_masterid',
+    'meta_key'   => 'api_masterId',
     'meta_value' => $params['masterId'],
     ) );
 
@@ -454,6 +460,14 @@ function handle_visit_response( $data ) {
             if ( empty( $params['visitOutcome'] ) || ! in_array( $params['visitOutcome'], array( 'prescribed', 'referred' ) ) ) {               
                 return new WP_REST_Response( array('status' => 400, 'error'   => 'Invalid or missing visitOutcome for CONSULT_CONCLUDED event',), 200 );
             }
+            if($params['visitOutcome'] == 'prescribed') {
+                $order->add_order_note("(Beluga Health message) : PATIENT VISIT HAS BEEN CONCLUDED. THE DOCTOR HAS WRITTEN A PRESCRIPTION.",true );
+            }
+            else {
+                $order->add_order_note("(Beluga Health message) : PATIENT VISIT HAS BEEN CONCLUDED WITHOUT A PRESCRIPTION. THE DOCTOR ISSUED A REFERRAL INSTEAD.",true );
+            }
+            $order->update_meta_data('visitOutcome', $params['visitOutcome']);
+            $order->save();
             break;
 
         case 'RX_WRITTEN':
@@ -468,17 +482,28 @@ function handle_visit_response( $data ) {
             // Validate each item in medsPrescribed.
             foreach ( $params['medsPrescribed'] as $index => $med ) {
                 $required_fields = array( 'name', 'strength', 'refills', 'quantity', 'medId', 'rxId' );
+                $presc_data = [];
                 foreach ( $required_fields as $field ) {
-                    if ( ! isset( $med[ $field ] ) || empty( $med[ $field ] && $med[ $field ] != 0  ) ) {                        
+                    if ( ! isset( $med[ $field ] ) || (empty( $med[ $field ]) && $med[ $field ] != 0  ) ) {                        
                         return new WP_REST_Response( array('status' => 400, 'error'   => sprintf( 'Field %s is required for item %d in medsPrescribed', $field, $index ),), 200 );
                     }
+                    $presc_data[] = $field.': '.$med[$field];
                 }
+                $order->add_order_note("(Beluga Health message) : <br>PRESCRIBED MEDICATION INFO: <br>".implode(', <br>',$presc_data)."",true );
+                $medsPrescribed = $order->get_meta('medsPrescribed') ?: [];
+                $medsPrescribed[] = $presc_data;
+                $order->update_meta_data('medsPrescribed', $medsPrescribed);
+                $order->save();
             }
             break;
 
         case 'CONSULT_CANCELED':
+            $order->add_order_note("(Beluga Health message) : PATIENT VISIT HAS BEEN CANCELED.",true );
+            $order->update_meta_data('visitOutcome', 'canceled');
+            $order->save();
+
         case 'DOCTOR_CHAT':
-            // No extra fields required for these events.
+             handle_doctor_chat_webhook($params);
             break;
 
         default:           
@@ -491,7 +516,7 @@ function handle_visit_response( $data ) {
 
 }
 
-function prefix_get_visit_arguments() {
+/*function prefix_get_visit_arguments() {
     $args = array();
 
     // masterId parameter.
@@ -581,7 +606,7 @@ function prefix_get_visit_arguments() {
     );
 
     return $args;
-}
+}*/
 
 
 
@@ -615,7 +640,7 @@ if (! function_exists('write_log')) {
 }
 
 
-
+//Convert all images to jpeg format. Compress the images to width: 1000px before encoding (or ensure that all images are <3MB). Encode the compressed images to base64 encoding. Do not include the MIME at the beginning of this string.
 function compress_resize_encode_images($image_fields,$posted_data) {
     
     $processed_images = [];
@@ -689,7 +714,7 @@ function compress_resize_encode_images($image_fields,$posted_data) {
 }
 
 
-
+//custom customer order notes
 function add_custom_order_note( $order_id, $note, $public = false ) {
     global $wpdb;
 
@@ -704,12 +729,15 @@ function add_custom_order_note( $order_id, $note, $public = false ) {
             'comment_author_email' => '',
             'comment_author_url'   => '',
             'comment_content'      => $note,
+            'comment_agent'        => 'WooCommerce',
             'comment_type'         => 'order_note',
             'comment_parent'       => 0,
             'user_id'              => 0,
             'comment_approved'     => 1,
+            'comment_date'         => current_time( 'mysql' ),
+            'comment_date_gmt'     => current_time( 'mysql', 1 ),
         ),
-        array('%d', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d')
+        array('%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s')
     );
 
     $comment_id = $wpdb->insert_id;
@@ -731,3 +759,201 @@ function add_custom_order_note( $order_id, $note, $public = false ) {
 }
 
 
+
+
+
+
+
+
+
+//chat doctor - patient webhook
+function handle_doctor_chat_webhook($params) {    
+
+    if (!isset($params['masterId'], $params['event'], $params['content'])) {
+        return new WP_REST_Response( array('status' => 400, 'error'   => 'Missing parameters',), 200 );        
+    }
+
+    $orders = wc_get_orders([
+        'limit' => 1,
+        'meta_key' => 'api_masterId',
+        'meta_value' => sanitize_text_field($params['masterId']),
+    ]);
+
+    if (empty($orders)) {       
+        return new WP_REST_Response( array('status' => 400, 'error'   => 'masterId does not exist',), 200 );
+    }
+
+    $order = $orders[0];
+    /*$chat = $order->get_meta('doctor_chat') ?: [];
+    $chat[] = [
+        'sender' => 'doctor', // or 'customer'
+        'message' => sanitize_textarea_field($params['content']),
+        'timestamp' => current_time('mysql'),
+    ];
+
+    $order->update_meta_data('doctor_chat', $chat);
+    $order->save();*/
+    $message = sprintf( __( '(Beluga Doctor message) :  %s <div class="hide-on-front"><hr><p style="font-size:13px;">Send a message to the doctor via the <a href="%s">order details page.</a></p></div>', 'sosothin' ), sanitize_textarea_field($params['content']),$order->get_view_order_url() );
+    $order->add_order_note($message,true );
+
+    return new WP_REST_Response( array('status' => 200, 'info'   => 'Successfully received message',), 200 );
+}
+
+
+function render_customer_chat_form($order_id) {
+    ?>
+    <form method="post" enctype="multipart/form-data" class="doctor-chat-form">
+        <h5>Send a message or image to the doctor</h5>
+        <input type="hidden" name="doctor_chat_order_id" value="<?php echo esc_attr($order_id); ?>">
+        <label class="label-img-on"><input type="checkbox" name="enable_img_sending" id="doctor-chat-img-on" value="0" class="input-checkbox fme-ccfw_class_main" ischanged="false"> Check if you would like to send an image.</label>
+        <textarea name="doctor_chat_message" required placeholder="Your message to the doctor"></textarea>
+        <label for="chat-image" class="label-chat-image" style="display:none;">Please choose image:</label>
+        <input id="chat-image" type="file" name="chat_image" accept=".jpg,.jpeg,.png" style="display:none;">
+        <input id="doctor-chat-image" type="hidden" name="doctor_chat_image" value="">
+        <button class="bricks-button bricks-background-primary" type="submit">Send</button>
+    </form>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const checkbox = document.getElementById('doctor-chat-img-on');
+            const textarea = document.querySelector('textarea[name="doctor_chat_message"]');
+            const fileInput = document.getElementById('chat-image');
+            const docChatImage = document.getElementById('doctor-chat-image');
+            const fileLabel = document.querySelector('label.label-chat-image');
+
+            checkbox.addEventListener('change', function () {
+                const isChecked = checkbox.checked;
+
+                // Toggle file input and label
+                fileInput.style.display = isChecked ? 'block' : 'none';
+                fileLabel.style.display = isChecked ? 'block' : 'none';
+
+                // Toggle textarea
+                textarea.style.display = isChecked ? 'none' : 'block';
+
+                // Required attributes
+                if (isChecked) {
+                    fileInput.setAttribute('required', 'required');
+                    textarea.removeAttribute('required');
+                } else {
+                    fileInput.removeAttribute('required');
+                    textarea.setAttribute('required', 'required');
+                }
+            });
+
+             fileInput.addEventListener('change', function () {
+                if (fileInput.files.length > 0) {
+                    docChatImage.value = fileInput.files[0].name;
+                } else {
+                    docChatImage.value = '';
+                }
+            });
+        });
+</script>
+
+    <?php
+}
+
+
+//send form data do doctor
+add_action('init', function () {     
+    if ( !empty($_POST['doctor_chat_order_id']) && (!empty($_POST['doctor_chat_message']) || !empty($_POST['doctor_chat_image'])) ) {
+        $order_id = absint($_POST['doctor_chat_order_id']);
+       if (!empty($_FILES['chat_image']['name'])) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+
+            $uploaded_file = $_FILES['chat_image'];
+
+            // Get the upload root directory
+            $upload_dir = wp_upload_dir();
+            $uploads_path = trailingslashit($upload_dir['basedir']); // wp-content/uploads/
+            $filename = sanitize_file_name($uploaded_file['name']);
+            $target_file_path = $uploads_path . $filename;
+
+            // Move uploaded file to uploads root
+            if (move_uploaded_file($uploaded_file['tmp_name'], $target_file_path)) {
+                // Set just the filename (not full path) to be used by compress_resize_encode_images
+                $_POST['doctor_chat_image'] = $filename;
+            } else {
+                wc_add_notice(__('Failed to upload image.', 'woocommerce'), 'error');
+            }
+        }
+
+        $encoded_chat_image = !empty($_POST['doctor_chat_image']) ? compress_resize_encode_images(['doctor_chat_image'],$_POST)['doctor_chat_image'] : '';
+        $message =  !empty($_POST['doctor_chat_message']) ? sanitize_textarea_field($_POST['doctor_chat_message']) : '';
+        
+        $order = wc_get_order($order_id);
+        
+        $entry = [
+            'sender' => 'customer',
+            'message' => $message,
+            'timestamp' => current_time('mysql'),
+            'image'  => $encoded_chat_image
+        ];
+
+        
+        // Send to doctor via API        
+        send_chat_to_doctor_api($order, $entry);
+
+        //wp_safe_redirect(wc_get_account_endpoint_url('doctor-chat'));
+        //exit;
+    }
+});
+
+function send_chat_to_doctor_api($order, $entry) {
+    
+    /*$user = wp_get_current_user();    
+    $first_name = $user->first_name ?: $user->user_firstname;
+    $last_name = $user->last_name ?: $user->user_lastname;*/
+
+    $first_name = $order->get_billing_first_name();
+    $last_name = $order->get_billing_last_name();
+    $content = empty($entry['image']) ? $entry['message'] : $entry['image'];
+    $master_id = $order->get_meta('api_masterId') ?: '';
+
+    $chat_args = [
+        'firstName' => $first_name,
+        'lastName' => $last_name,
+        'content' => $content,
+        'isMedia' => !empty($entry['image']),
+        'masterId' => $master_id,
+    ];    
+  //print_r($chat_args);
+    $response = wp_remote_post('https://api-staging.belugahealth.com/external/receiveChat', 
+         array(
+          'method' => 'POST',
+          'httpversion' => '1.0',
+          'headers' => array(
+           'Authorization' => 'Bearer z17DZCRW9jjUwuG3uRNr',
+            'Content-Type' => 'application/json'),
+          'body' => json_encode($chat_args, JSON_UNESCAPED_SLASHES)
+           )
+    );
+    //write_log($response); 
+
+    // Handle API response
+    if (is_wp_error($response)) {
+        $error_message = 'There was an error connecting to the Beluga Health service. Please try again.';
+    } else {
+        $response_code = wp_remote_retrieve_response_code($response);
+        $response_body = wp_remote_retrieve_body($response);
+        $response_data = json_decode($response_body, true);
+
+        if ($response_code !== 200 || $response_data['status'] !== 200) {
+            $error_message = sprintf( __( 'Your message has not been sent. (%s)', 'sosothin' ), $response_data['info'] );
+        }
+    }
+    if (!empty($error_message)) {
+        write_log($error_message); 
+        wc_add_notice($error_message, 'error');
+    }
+    else {
+        wc_add_notice( 'Your message has been sent susccessfully!', 'success' );
+        if( empty($entry['image']) && !empty($entry['message']) ) {  
+           /* $chat = $order->get_meta('doctor_chat') ?: [];      
+            $chat[] = $entry;
+            $order->update_meta_data('doctor_chat', $chat);
+            $order->save();*/
+            add_custom_order_note( $order->get_id(), sprintf( __( '(Patient message to Doctor) :  %s', 'sosothin' ), $entry['message'] ), true );  
+        }
+    }
+}
