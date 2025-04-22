@@ -112,6 +112,7 @@ function validate_with_external_api() {
 
     switch ($posted_data[$current_dose_name]) {
         case 'Semaglutide 0.25mg':
+        case 'Tirzepatide 1.5mg':
         case 'Tirzepatide 2.5mg':
             $current_dose = 'Weightloss1';
             break;
@@ -255,7 +256,7 @@ function validate_with_external_api() {
         }
 
         if($posted_data['current_meds_sem_tirz']=='tirzepatide') {
-            $args1["formObj"]["Q".$i] = "Which Tirzepatide (Zepbound, Mounjaro) dose most closely matches your most recent dose? POSSIBLE ANSWERS: Tirzepatide 2.5mg; Tirzepatide 5mg; Tirzepatide 7.5mg; Tirzepatide 10mg; Tirzepatide 12.5mg; Tirzepatide 15mg";
+            $args1["formObj"]["Q".$i] = "Which Tirzepatide (Zepbound, Mounjaro) dose most closely matches your most recent dose? POSSIBLE ANSWERS: Tirzepatide 1.5mg; Tirzepatide 2.5mg; Tirzepatide 5mg; Tirzepatide 7.5mg; Tirzepatide 10mg; Tirzepatide 12.5mg; Tirzepatide 15mg";
             $args1["formObj"]["A".$i++] = isset($posted_data['current_dose_tirzepatide']) ? $posted_data['current_dose_tirzepatide'] : '';
         }
 

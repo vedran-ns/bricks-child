@@ -33,6 +33,7 @@ add_filter( 'bricks/builder/i18n', function( $i18n ) {
 } );
 
 include(get_stylesheet_directory()."/api/beluga-api.php") ;
+include(get_stylesheet_directory()."/api/google-sheet-products-api.php") ;
 
 
 
@@ -278,7 +279,7 @@ function save_custom_variation_fields($variation_id, $i) {
         'medicine_dispense',
         'medicine_medinfo',
     ];
-	
+    
     foreach ($fields as $field) {
         if (isset($_POST[$field][$i])) {
             $value = sanitize_text_field($_POST[$field][$i]);
@@ -378,7 +379,7 @@ add_action('woocommerce_single_variation', 'display_custom_fields_on_product_pag
 function display_custom_fields_on_product_page() {
     global $product;
     ?>
-	<h4 id="var-info" style="margin: 20px 0;display:none;">Info</h4>
+    <h4 id="var-info" style="margin: 20px 0;display:none;">Info</h4>
     <div class="variation-custom-fields">
         <div id="custom-variation-fields"></div>
     </div>
@@ -421,7 +422,7 @@ function display_custom_fields_on_product_page() {
                 }
 
                 $('#custom-variation-fields').html(fieldsHtml);
-				$('#var-info').show();
+                $('#var-info').show();
             });
 
             // Clear custom fields when no variation is selected
@@ -482,31 +483,31 @@ function first_order_add_bag() {
 add_action( 'wp_footer', 'woocommerce_checkout_scripts' );
 function woocommerce_checkout_scripts() {
     if (is_checkout()) {
-		$product_name = '';
-		$current_med_use = '';
-		foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {  
-   			$product_name = lcfirst($cart_item['data']->get_title());
+        $product_name = '';
+        $current_med_use = '';
+        foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {  
+            $product_name = lcfirst($cart_item['data']->get_title());
             if ($cart_item['data'] instanceof WC_Product_Variation) {
-    			foreach ($cart_item['data']->get_variation_attributes() as $atr_key => $atr_value) {
-    				if ($atr_key=='attribute_pa_current-medication-use'){
-          				$current_med_use = $atr_value;
-    					break;
-        			}				
-      			}
+                foreach ($cart_item['data']->get_variation_attributes() as $atr_key => $atr_value) {
+                    if ($atr_key=='attribute_pa_current-medication-use'){
+                        $current_med_use = $atr_value;
+                        break;
+                    }               
+                }
             }
-			break;
-  		}
-		//$current_med_use_input_id = $current_med_use == 'yes' ? '#current_meds_sem_tirz_'.$product_name : '#current_meds_sem_tirz_neither';
+            break;
+        }
+        //$current_med_use_input_id = $current_med_use == 'yes' ? '#current_meds_sem_tirz_'.$product_name : '#current_meds_sem_tirz_neither';
         $current_med_use_input_id = $current_med_use == 'yes' ? '#current_meds_sem_tirz_semaglutide,#current_meds_sem_tirz_tirzepatide' : '#current_meds_sem_tirz_neither';
 
-				
+                
     ?>
-		<script type="text/javascript">
-			
-		jQuery( document ).ready(function( $ ) {  
-			$('#bmi').attr('readonly', true);
-			//$('#current_meds_sem_tirz_field input:not(<?php //echo  $current_med_use_input_id ?>)').attr('disabled', true);	
-			//$('#current_meds_sem_tirz_field input:not(<?php //echo  $current_med_use_input_id ?>)').css('display', 'none');			
+        <script type="text/javascript">
+            
+        jQuery( document ).ready(function( $ ) {  
+            $('#bmi').attr('readonly', true);
+            //$('#current_meds_sem_tirz_field input:not(<?php //echo  $current_med_use_input_id ?>)').attr('disabled', true);   
+            //$('#current_meds_sem_tirz_field input:not(<?php //echo  $current_med_use_input_id ?>)').css('display', 'none');           
             <?php if($current_med_use == 'yes') { ?>
                     //$('#current_meds_sem_tirz_field label[for="current_meds_sem_tirz_neither"]').hide();
             <?php } 
@@ -524,74 +525,125 @@ function woocommerce_checkout_scripts() {
 
 
 
-			$('#feet, #inches, #pounds').on('keyup mouseup', function () {
-        		// Get values from the input fields
-        		const feet = parseFloat(jQuery('#feet').val()) || 0;
-        		const inches = parseFloat(jQuery('#inches').val()) || 0;
-        		const pounds = parseFloat(jQuery('#pounds').val()) || 0;
+            $('#feet, #inches, #pounds').on('keyup mouseup', function () {
+                // Get values from the input fields
+                const feet = parseFloat(jQuery('#feet').val()) || 0;
+                const inches = parseFloat(jQuery('#inches').val()) || 0;
+                const pounds = parseFloat(jQuery('#pounds').val()) || 0;
 
-        		// Convert feet and inches to total inches
-        		const totalInches = (feet * 12) + inches;
+                // Convert feet and inches to total inches
+                const totalInches = (feet * 12) + inches;
 
-        		if (totalInches > 0) {
-        			// Calculate BMI
-        			const bmi = (pounds / (totalInches * totalInches)) * 703;
+                if (totalInches > 0) {
+                    // Calculate BMI
+                    const bmi = (pounds / (totalInches * totalInches)) * 703;
 
-        			// Display BMI in the #bmi_field element
-        			//jQuery('#bmi_field').html('<h5 style="font-weight: 400;padding-top: 10px;"> Your BMI is: ' + bmi.toFixed(2) + '</h5>');
-        			jQuery('#bmi').val(bmi.toFixed(2)).trigger('change');
-        		} else {
-        			// Handle invalid height input
-        			jQuery('#bmi').html('<h5 style="font-weight: 400;padding-top: 10px;"> Your BMI is: ' + 'Enter valid height.'+ '</h5>');
-        		}
-        	});
+                    // Display BMI in the #bmi_field element
+                    //jQuery('#bmi_field').html('<h5 style="font-weight: 400;padding-top: 10px;"> Your BMI is: ' + bmi.toFixed(2) + '</h5>');
+                    jQuery('#bmi').val(bmi.toFixed(2)).trigger('change');
+                } else {
+                    // Handle invalid height input
+                    jQuery('#bmi').html('<h5 style="font-weight: 400;padding-top: 10px;"> Your BMI is: ' + 'Enter valid height.'+ '</h5>');
+                }
+            });
+            
+            $('#commonly_side_effects_field input').change(function() {
+                let regime_type = '';
+                let current_dose = '';
 
-		});
-			
-		//window.onload = function(){jQuery('input[name^="condition_"]').prop('checked',false).trigger('change');}
-		window.onload = function(){
-			setTimeout(function() {
-				jQuery('input[name^="condition_"]').prop('checked',false).trigger('change');
-				//jQuery('#<?php echo  $current_med_use_input_id ?>').click().trigger('change');
-			}, 2000 );
-			
-			// Select the element to observe
-			const targetElement = document.getElementById('not_eligible_field');
+                if ($('#current_meds_sem_tirz_field input:checked').val() === 'neither') {
+                  if ($('#commonly_side_effects_field input:checked').val() === 'Yes') {
+                    regime_type = 'alternative';
+                    current_dose = 'lowest';
+                  } 
+                  else {
+                    regime_type = 'standard';
+                    current_dose = 'starter';        
+                   }
 
-			// Create a MutationObserver instance
-			const observer = new MutationObserver((mutationsList) => {
-				mutationsList.forEach((mutation) => {
-					if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-						// Check if the element is now visible
-						if (targetElement.style.display === 'none') {
-							//console.log('The element is now hidden');
-							 document.getElementById('place_order').style.display="block";
-							
-							/*if (document.querySelector('#bmi').value.trim() !== "0") {
-								document.querySelectorAll('#consent_confirm_bmi_field, #consent_bmi_content_field, #consent_bmi_heading_field')
+                    $.ajax({
+                      url: '/wp-json/medics/v1/get-medics',
+                      method: 'GET',
+                      data: {
+                        regime_type: regime_type,
+                        current_dose: current_dose
+                      },
+                      success: function(response) {
+                        //console.log('Google Sheet Response:', response);
+
+                        // Clear old options
+                        $('#prefered_dose').empty();
+
+                        // Loop through returned items
+                        response.forEach(function(item) {
+                          const favName = item.original_row['Favorite Name'] || 'Unnamed';
+                          const medId = item.original_row['Medicine Id'] || '';
+                          const strength = item.original_row['Strength'] || '';
+                          const refills = item.original_row['Refills'] || '';
+                          const pharmacyId = item.original_row['Pharmacy ID'] || '';
+
+                          // Construct option value (you can change format if needed)
+                          const optionValue = `${medId};${strength};${refills};${pharmacyId}`;
+
+                          $('#prefered_dose').append(new Option(favName, optionValue));
+                        });
+                      },
+                      error: function(xhr, status, error) {
+                        console.error('AJAX Error:', status, error);
+                      }
+                    });
+
+                }
+
+                console.log('Selected Regime:', regime_type);
+              });
+
+        });
+            
+        //window.onload = function(){jQuery('input[name^="condition_"]').prop('checked',false).trigger('change');}
+        window.onload = function(){
+            setTimeout(function() {
+                jQuery('input[name^="condition_"]').prop('checked',false).trigger('change');
+                //jQuery('#<?php echo  $current_med_use_input_id ?>').click().trigger('change');
+            }, 2000 );
+            
+            // Select the element to observe
+            const targetElement = document.getElementById('not_eligible_field');
+
+            // Create a MutationObserver instance
+            const observer = new MutationObserver((mutationsList) => {
+                mutationsList.forEach((mutation) => {
+                    if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                        // Check if the element is now visible
+                        if (targetElement.style.display === 'none') {
+                            //console.log('The element is now hidden');
+                             document.getElementById('place_order').style.display="block";
+                            
+                            /*if (document.querySelector('#bmi').value.trim() !== "0") {
+                                document.querySelectorAll('#consent_confirm_bmi_field, #consent_bmi_content_field, #consent_bmi_heading_field')
     .forEach(el => el.style.display = "block");
-							}*/
-							
-						}
-						else {
-						  // console.log('The element is now visible');
-						   document.getElementById('place_order').style.display="none";
-						   /*document.querySelectorAll('#consent_confirm_bmi_field, #consent_bmi_content_field, #consent_bmi_heading_field')
+                            }*/
+                            
+                        }
+                        else {
+                          // console.log('The element is now visible');
+                           document.getElementById('place_order').style.display="none";
+                           /*document.querySelectorAll('#consent_confirm_bmi_field, #consent_bmi_content_field, #consent_bmi_heading_field')
     .forEach(el => el.style.display = "none");*/
-						}
-					}
-				});
-			});
+                        }
+                    }
+                });
+            });
 
-			// Configure the observer to watch for style attribute changes
-			observer.observe(targetElement, { attributes: true });
+            // Configure the observer to watch for style attribute changes
+            observer.observe(targetElement, { attributes: true });
 
-			// Optionally, stop observing when no longer needed
-			// observer.disconnect();
+            // Optionally, stop observing when no longer needed
+            // observer.disconnect();
 
-		
-		}
-		</script>
+        
+        }
+        </script>
     <?php
     }
 }
@@ -662,8 +714,6 @@ function add_beluga_api_response_messages( $order, $sent_to_admin, $plain_text, 
         printf( __( '<p>(Beluga Health message): %s. %s</p><p style="font-size:13px;">Send a message to the doctor via the <a href="%s">order details page.</a></p>', 'sosothin' ), $order->get_meta('api_response_visit_info'),$order->get_meta('api_response_images_info'),$order->get_view_order_url() ) ;  
     }   
 }
-
-
 
 
 

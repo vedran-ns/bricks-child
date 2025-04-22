@@ -22,6 +22,17 @@ form.woocommerce-checkout.bricks-default-checkout {
 .woocommerce-checkout .woocommerce-additional-fields__field-wrapper label {
   	font-weight: 400;
 }
+#prefered_dose_field {
+	border: 2px solid rgba(43, 41, 35, 0.47);
+	padding: 12px;
+	margin: revert;
+	border-radius: 5px;
+}
+#prefered_dose {
+	border: 1px solid #b9b9b9;
+	width: auto;
+	padding-right: 35px;
+}
 #id_photo_field, #full_body_image_field, #current_meds_side_efects_textarea_field, #prescription_picture_field, #selected_medical_conditions_field, #current_medical_conditions_field, #current_medications_list_dosages_field, #current_allergies_list_field, #id_photo_content_field, #full_body_image_content_field, #consent_glp1_gip_content_field {
 	border: 1px solid rgba(128, 128, 128, 0.47);
 	padding: 12px;
@@ -62,9 +73,6 @@ form.woocommerce-checkout.bricks-default-checkout {
 }
 .label-img-on {
   	margin: 10px 0;
-}
-.hide-on-front {
-  	display: none;
 }
 @media (min-width: 991px) {
 	.woocommerce-additional-fields__field-wrapper .form-row-first, .woocommerce-additional-fields__field-wrapper .form-row-last {
