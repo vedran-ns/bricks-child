@@ -1,0 +1,4 @@
+api/google-service-account.json
+api/composer.json
+api/composer.lock
+/api/vendor

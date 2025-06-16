@@ -1,66 +1,100 @@
 <?php
     defined( 'ABSPATH' ) || die( "Can't access directly" );
 
-add_action('woocommerce_before_checkout_process', 'check_api_availability_before_checkout');
-function check_api_availability_before_checkout() {
-    $test_response = wp_remote_post('https://api-staging.belugahealth.com/visit/createNoPayPhotos', array(
-        'method'  => 'POST',
-        'timeout' => 15, 
-    ));
+add_action('woocommerce_before_checkout_process', 'validate_with_external_api');
+
+function validate_with_external_api() {
+
+    $posted_data = WC()->checkout->get_posted_data();
+
+    //write_log($posted_data);  
     
-
-    if (is_wp_error($test_response)) {
-        $error_message = $test_response->get_error_message();
-        $error_code = $test_response->get_error_code();
-
-        $error_message = 'There was an error connecting to the Health provider service. Please try again. (' . $error_message . ' - Error Code: ' . $error_code . ')';
-        wc_add_notice($error_message, 'error');
-    }
-     /*else {
-        $test_response_code = wp_remote_retrieve_response_code($test_response);
-
-        if ($test_response_code === 400) {
-            
-        } 
-    }*/
-}
-
-add_action('woocommerce_checkout_order_processed', 'get_save_payload_data_to_ordermeta', 10, 3);
-
-function get_save_payload_data_to_ordermeta($order_id, $posted_data, $order) {
-   
-    //write_log(json_decode($posted_data['prefered_dose']));
-    $prefered_dose_data = isset($posted_data['current_meds_sem_tirz']) ? json_decode($posted_data['prefered_dose']) : '';
     $product_name = '';
-    $med_id = $prefered_dose_data ? $prefered_dose_data->medId : '';    
-    $product_med_str = $prefered_dose_data ? $prefered_dose_data->strength : '';
-    $product_med_qty = $prefered_dose_data ? $prefered_dose_data->quantity : '';
-    $product_med_ref = $prefered_dose_data ? $prefered_dose_data->refills : '';
-    $current_dose = $prefered_dose_data ? $prefered_dose_data->category : '';      
-    $visit_type = $prefered_dose_data ? $prefered_dose_data->visitType : '';
-    $pharmacy_id = $prefered_dose_data ? $prefered_dose_data->pharmacyId : '';
+    $product_sku = '';
+    $product_med_cat = '';
+    $product_med_str = '';
+    $product_med_qty = '';
+    $product_med_ref = '';
+    $current_med_use = '';
+    $weekly_dose_preference = '';
+    $visit_type = '';
+    $pharmacy_id = '';
 
-    $glp1_order = false;
-
-    foreach( $order->get_items( 'line_item' ) as $item_id => $item ) {
+    foreach( WC()->cart->get_cart() as $cart_item_key => $item ) {
 
         // Get parent product object
         $product_id = $item['product_id'];
         $parent_product = wc_get_product( $product_id );
-        $product_name = $parent_product->get_title();       
-        
-        
-        if( !has_term( 'glp-1', 'product_cat', $product_id ) ) {
-            continue;  
+        $product_name = $parent_product->get_title();
+
+        if( $item['variation_id'] > 0 ){
+            if( !empty($posted_data['prescription_picture']) ) {
+                $variation_id = $item['variation_id'];
+            }
+            else{
+                switch ($product_name) {
+                    case 'Semaglutide':
+                        $variation_id = 1630;
+                        break;
+                    case 'Tirzepatide':
+                        $variation_id = 1649;
+                        break;
+                    case 'Mounjaro':
+                        $variation_id = 1918;
+                        break;
+                    case 'Ozempic':
+                        $variation_id = 1944;
+                        break;
+                    case 'Wegovy':
+                        $variation_id = 1954;
+                        break;
+                    case 'Zepbound':
+                        $variation_id = 1964;
+                        break;
+                    default:
+                        // code...
+                        break;
+                }
+                //$variation_id = !empty($posted_data['prescription_picture']) ? $item['variation_id'] : ($product_name == 'Semaglutide' ? 1630 : 1649); // Variation product  
+            }
+                      
+        } else {            
+            $variation_id = 0;
         }
-        else  { 
-            $glp1_order = true;   
-        }  
+        
+        
+        if( !has_term( 'glp-1', 'product_cat', $product_id ) ) continue;
+
+        // Get attributes from parent
+        $pharmacy_id = $parent_product->get_attribute('pa_pharmacy-id');
+        $visit_type = $parent_product->get_attribute('pa_visit-type');     
+        
+
+        if ($variation_id > 0) {
+            $variation = wc_get_product( $variation_id );
+            if ($variation instanceof WC_Product_Variation) {
+                // SKU
+                $product_sku = $variation->get_sku() ?: '';
+
+                // Custom meta fields (medicine-related)
+                $product_med_cat  = get_post_meta($variation_id, 'medicine_category', true) ?: '';
+                $product_med_str  = get_post_meta($variation_id, 'medicine_strength', true) ?: 'N/A';
+                $product_med_qty  = get_post_meta($variation_id, 'medicine_quantity', true) ?: '';
+                $product_med_ref  = get_post_meta($variation_id, 'medicine_refills', true) ?: '0';            
+
+                // Variation attributes
+                $current_med_use = $variation->get_attribute('pa_current-medication-use');
+                $weekly_dose_preference =  $variation->get_attribute('pa_dose') ;
+                //$current_dose_name = 'current_dose_'.strtolower($product_name);
+                $current_dose_name = isset($posted_data['current_meds_sem_tirz']) && $posted_data['current_meds_sem_tirz']=='semaglutide' ? 'current_dose_semaglutide' : (isset($posted_data['current_meds_sem_tirz']) && $posted_data['current_meds_sem_tirz']=='tirzepatide' ? 'current_dose_tirzepatide' : '');
+                
+            }
+        }
 
     }
 
     
-    if( !$glp1_order ) return;
+    if( !has_term( 'glp-1', 'product_cat', $product_id ) ) return;
 
     $current_past_med_conds_array = [];
     foreach ($posted_data as $key => $value) {
@@ -74,11 +108,39 @@ function get_save_payload_data_to_ordermeta($order_id, $posted_data, $order) {
             }
         }
     }
-
     $current_past_med_conds = !empty($current_past_med_conds_array) ? implode(', ', $current_past_med_conds_array) : 'None';
 
+    switch ($posted_data[$current_dose_name]) {
+        case 'Semaglutide 0.25mg':
+        case 'Tirzepatide 2.5mg':
+            $current_dose = 'Weightloss1';
+            break;
+        case 'Semaglutide 0.5mg':
+        case 'Tirzepatide 5mg':
+            $current_dose = 'Weightloss2';
+            break;
+        case 'Semaglutide 1mg':
+        case 'Tirzepatide 7.5mg':
+            $current_dose = 'Weightloss3';
+            break;
+        case 'Semaglutide 1.5mg':
+        case 'Semaglutide 1.7mg':
+        case 'Semaglutide 2mg':
+        case 'Tirzepatide 10mg':
+            $current_dose = 'Weightloss4';
+            break;
+        case 'Semaglutide 2.5mg':
+        case 'Tirzepatide 12.5mg':
+        case 'Tirzepatide 15mg':
+            $current_dose = 'Weightloss5';
+            break;
+        
+        default:
+            // code...
+            break;
+    }
 
-    
+
     switch ($posted_data['new_dose']) {
         case 'same':
             $new_dose_text = 'Stay at the same dose or equivalent dose';
@@ -95,7 +157,7 @@ function get_save_payload_data_to_ordermeta($order_id, $posted_data, $order) {
             break;
     }
     
-    //$masterId = uniqid(substr($posted_data['billing_first_name'], 0, 1).substr($posted_data['billing_last_name'], 0, 1).'_');
+    $masterId = uniqid(substr($posted_data['billing_first_name'], 0, 1).substr($posted_data['billing_last_name'], 0, 1).'_');
 
     $args1 = [
             "formObj" => [
@@ -117,16 +179,16 @@ function get_save_payload_data_to_ordermeta($order_id, $posted_data, $order) {
                 "weightlossPreference" => isset($posted_data['new_dose']) ? sanitize_text_field($posted_data['new_dose']) : 'N/A',
                 "currentDose" => isset($current_dose) ? sanitize_text_field($current_dose) : 'N/A',
                 "patientPreference" => [
-                    [                        
-                        "name" => $prefered_dose_data ? $prefered_dose_data->medFullName : '',
+                    [
+                        "name" => $product_name.' '.$weekly_dose_preference,
                         "strength" => $product_med_str,
                         "quantity" => $product_med_qty,
                         "refills" => $product_med_ref,
-                        "medId" => $med_id
+                        "medId" => $product_sku
                     ]
                 ],                         
             ],
-            "masterId" => "".$order_id."",
+            "masterId" => "".$masterId."",
             "company" => 'soSoThin',
             "pharmacyId" => $pharmacy_id,
             "visitType" => $visit_type
@@ -173,19 +235,19 @@ function get_save_payload_data_to_ordermeta($order_id, $posted_data, $order) {
     $args1["formObj"]["Q".$i] = "Are you currently, or have you in the past two months, taken any GLP-1 medications? POSSIBLE ANSWERS: Semaglutide (Ozempic, Wegovy, Rybelsus); Tirzepatide (Zepbound, Mounjaro);None of these";
     $args1["formObj"]["A".$i++] = isset($posted_data['current_meds_sem_tirz']) ? ( $posted_data['current_meds_sem_tirz']=='semaglutide' ? 'Semaglutide (Ozempic, Wegovy, Rybelsus) ' : ( $posted_data['current_meds_sem_tirz']=='tirzepatide' ? 'Tirzepatide (Zepbound, Mounjaro) ' : 'None of these' ) ) : '';
 
-    /*if($posted_data['current_meds_sem_tirz']=='neither') {
+    if($posted_data['current_meds_sem_tirz']=='neither') {
         $args1["formObj"]["Q".$i] = "People have different sensitivities to medications and commonly experience side effects to standard dosing regimens. Do you commonly experience side effects to medications or feel like you're sensitive to the impacts of most medications? POSSIBLE ANSWERS: Yes; No";
         $args1["formObj"]["A".$i++] = isset($posted_data['commonly_side_effects']) ? $posted_data['commonly_side_effects'] : '';
-    }*/
+    }
 
     if($posted_data['current_meds_sem_tirz']=='semaglutide' || $posted_data['current_meds_sem_tirz']=='tirzepatide' ) {
-       /* $args1["formObj"]["Q".$i] = "Have you experienced side effects from your current medication? POSSIBLE ANSWERS: Yes; No";
+        $args1["formObj"]["Q".$i] = "Have you experienced side effects from your current medication? POSSIBLE ANSWERS: Yes; No";
         $args1["formObj"]["A".$i++] = isset($posted_data['current_meds_side_efects']) ? $posted_data['current_meds_side_efects'] : '';
 
         if($posted_data['current_meds_side_efects'] == 'Yes') {
             $args1["formObj"]["Q".$i] = "Please describe the side effects that you've experienced";
             $args1["formObj"]["A".$i++] = isset($posted_data['current_meds_side_efects_textarea']) ? sanitize_text_field($posted_data['current_meds_side_efects_textarea']) : '';
-        }*/
+        }
 
         if($posted_data['current_meds_sem_tirz']=='semaglutide') {
             $args1["formObj"]["Q".$i] = "Which Semaglutide (Ozempic, Wegovy, Rybelsus) dose most closely matches your most recent dose? POSSIBLE ANSWERS: Semaglutide 0.25mg; Semaglutide 0.5mg; Semaglutide 1mg; Semaglutide 1.5mg; Semaglutide 1.7mg; Semaglutide 2mg; Semaglutide 2.5mg";
@@ -216,134 +278,72 @@ function get_save_payload_data_to_ordermeta($order_id, $posted_data, $order) {
     $args1["formObj"]["Q".$i] = "Consent (GLP-1 and GLP-1/GIP): Indication for Use: You are requesting treatment with a GLP-1 (Ozempic, Wegovy, or compounded semaglutide) or GIP/GLP-1 receptor agonist (Mounjaro, Zepbound, or compounded tirzepatide) medication as part of your treatment plan for the management of weight or obesity. These medications work by mimicking the action of incretin hormones, which help regulate blood sugar levels, promote feeling full, and reduce food intake. Potential Benefits:Weight loss or weight management,Improved blood glucose control,Reduced cardiovascular risk,Potential improvement in overall metabolic health. Potential Side Effects: While these medications can be beneficial, they may also cause side effects.  Although not common, these medications can result in emergency room visits, hospitalizations, or even death. Common and serious side effects include, but are not limited to Common Side Effects: Nausea,Vomiting,Diarrhea,Constipation, Decreased appetite, Indigestion. Serious Side Effects: Pancreatitis (inflammation of the pancreas), Hypoglycemia (low blood sugar) especially when used with other diabetes medications,Gallbladder disease (e.g., gallstones),Kidney problems, Allergic reactions (e.g., rash, itching, swelling), Gastroparesis (paralysis of the bowels). Risks and Considerations:  Pancreatitis: There is a risk of developing pancreatitis. If you experience severe abdominal pain, nausea, or vomiting, you should contact your healthcare provider immediately. Thyroid Tumors: Animal studies have shown an increased risk of thyroid tumors with certain GLP-1 medications. Although this has not been confirmed in humans, please inform your healthcare provider if you have a history of thyroid cancer. Hypoglycemia: When taken with other diabetes medications, particularly insulin or sulfonylureas, there is a risk of low blood sugar. It is important that your provider knows if any of these medications are added to your regimen. Kidney Function: This medication may affect kidney function, particularly in patients with existing kidney disease. Regular monitoring of kidney function may be required. Monitoring and Follow-up: You will require regular follow-up visits to monitor your response to the medication and to assess for any side effects. We may intermittently ask for full-body selfie images to ensure that your reported weight is consistent. I acknowledge the potential benefits, risks, and side effects of GLP-1 or GIP/GLP-1 receptor agonist medications. I understand the importance of regular monitoring and follow-up appointments. I consent to the use of GLP-1 or GIP/GLP-1 receptor agonist medications as part of my treatment plan for overweight or obesity.";
     $args1["formObj"]["A".$i++] = "I acknowledge that I have read and understood the above information.";
 
-       //write_log($args1); 
+       write_log($args1); 
       //wc_add_notice('Your order could not be processed. Please check your details and try again.', 'error');
-
-      $image_fields = [];
-        if(!empty($posted_data['prescription_picture'])) {
-            $image_fields['prescription_picture'] = $posted_data['prescription_picture'];
-        }
-        if(!empty($posted_data['id_photo_front'])) {
-            $image_fields['id_photo_front'] = $posted_data['id_photo_front'];
-        }        
-        if(!empty($posted_data['id_photo_back'])) {
-             $image_fields['id_photo_front'] = $posted_data['id_photo_front'];
-        }
-        if(!empty($posted_data['full_body_image'])) {
-             $image_fields['full_body_image'] = $posted_data['full_body_image'];
-        }
-
-      //store payload Data and image fields in order meta        
-        $order->update_meta_data('api_payload_data', serialize($args1));  
-        $order->update_meta_data('api_image_fields', $image_fields);    
-        $order->save();
-
-         
-
-         // If the medication product GLP-1 has been found by medicine id (SKU), then add it to the order 
-        $product_medic_id = wc_get_product_id_by_sku($med_id);  // Product Medicine Id on the Beluga dashbord should be equal to SKU in wc product page  
-        //$fee_id = 'additional_fee'; 
-
-        
-        if ($product_medic_id) {            
-            $order->add_product(wc_get_product($product_medic_id), 1);
-
-            // Remove med product stored as an additional fee
-            foreach ($order->get_fees() as $fee) {
-               // if ($fee->get_name() === $fee_id) {
-                    $order->remove_item($fee->get_id());
-                //}
-            }
-           
-            $order->save();
-        } else {
-            write_log("The product with SKU '{$sku}' has not been found.","beluga-log");
-        }
-
-}
-
-
-
-/**
- * Send patient's payload data to the beluga healthcare
- */
-//add_action( 'woocommerce_order_status_processing', 'send_form_data_create_beluga_visit' );
-//add_action( 'woocommerce_order_status_completed', 'send_form_data_create_beluga_visit' );
-add_action( 'woocommerce_order_status_on-hold', 'send_form_data_create_beluga_visit' );
-
-function send_form_data_create_beluga_visit( $order_id ) {
-
-    $order = wc_get_order( $order_id );
-
-    if(empty($order->get_meta('api_payload_data') )) {
-        write_log('Something went wrong, patient payload data is empty!','beluga-log');
-        add_custom_order_note( $order_id, '(System error) : Something went wrong, patient payload data is empty!', true ); 
-        return;
-    }
-
-    $payloadData = unserialize($order->get_meta('api_payload_data')) ;
-
-    $image_fields = $order->get_meta('api_image_fields') ;
-
-    write_log($payloadData);
-    //write_log($image_fields);
 
     $response = wp_remote_post( 'https://api-staging.belugahealth.com/visit/createNoPayPhotos', 
         array(
           'method' => 'POST',
           'httpversion' => '1.0',
-          'timeout' => 60,
           'headers' => array(
            'Authorization' => 'Bearer z17DZCRW9jjUwuG3uRNr',
             'Content-Type' => 'application/json'),
-          'body' => json_encode($payloadData, JSON_UNESCAPED_SLASHES)
+          'body' => json_encode($args1, JSON_UNESCAPED_SLASHES)
            )
          );
 
-    write_log($response,'beluga-log');
+    //write_log($response);
 
      // Handle API response
     if (is_wp_error($response)) {
-        $error_message = $response->get_error_message();
-        $error_code = $response->get_error_code();
-    
-        $error_message = 'There was an error connecting to the Health provider service. Patient visit is not created. Please contact us. ('.$error_message.')';    
-    
-    } 
-    else {
+        $error_message = 'There was an error connecting to the health service. Please try again.';
+    } else {
         $response_code = wp_remote_retrieve_response_code($response);
         $response_body = wp_remote_retrieve_body($response);
         $response_data = json_decode($response_body, true);
 
         if ( ($response_code !== 200 || $response_data['status'] !== 200) || !isset($response_data['data']['masterId'], $response_data['data']['visitId'])) {
-            $error_message = 'Patient visit is not created. Please check your details and contact us. ('.$response_data['error'].')';
+            $error_message = 'Your order could not be processed. Please check your details and try again. ('.$response_data['error'].')';
         }
     }
 
     // If API request failed, cancel order and throw error
     if (!empty($error_message)) {         
 
-        write_log($error_message,'beluga-log');         
+        write_log($error_message);       
 
-        $order->update_meta_data('api_response_visit_info', $error_message);                  
-        $order->save(); 
-        add_custom_order_note( $order_id, '(Healthcare Provider) : '.$error_message, true );          
-        
-        //wc_add_notice($error_message, 'error');
+        // Ensure no further processing happens
+        wc_add_notice($error_message, 'error');
 
     }
     else {
 
-        // If API is successful, store masterId,visitId,responseInfo 
+        // If API is successful, store masterId,visitId,responseInfo,payloadData in wc session        
+        if (WC()->session) {
+            WC()->session->set('masterId', $response_data['data']['masterId']); 
+            WC()->session->set('visitId', $response_data['data']['visitId']); 
+            WC()->session->set('responseVisitInfo', strtoupper($response_data['info']));           
+            WC()->session->set('payloadData', $args1);
+        }
+         write_log($args1);   
 
-        $order->update_meta_data('api_masterId', $response_data['data']['masterId'] );
-        $order->update_meta_data('api_visitId', $response_data['data']['visitId']);        
-        $order->update_meta_data('api_response_visit_info', strtoupper($response_data['info']));                  
-        $order->save(); // Ensure data is saved
-        add_custom_order_note( $order_id, '(Healthcare Provider) : '.strtoupper($response_data['info']), true );        
-        
+
+        $image_fields = [];
+        if(!empty($posted_data['prescription_picture'])) {
+            $image_fields[] = 'prescription_picture';
+        }
+        if(!empty($posted_data['id_photo_front'])){
+             $image_fields[] = 'id_photo_front';
+        }
+        if(!empty($posted_data['id_photo_back'])){
+             $image_fields[] = 'id_photo_back';
+        }
+        if(!empty($posted_data['full_body_image'])){
+             $image_fields[] = 'full_body_image';
+        }
+
          
-        $images_base64_codes = $image_fields ? compress_resize_encode_images($image_fields,$order_id) : array();
+        $images_base64_codes = $image_fields ? compress_resize_encode_images($image_fields,$posted_data) : array();
         //write_log($images_base64_codes);
 
         $args_imgs = [];
@@ -366,26 +366,46 @@ function send_form_data_create_beluga_visit( $order_id ) {
            )
          );
 
-        write_log($response2,'beluga-log');
+        //write_log($response2);
         
         if (is_wp_error($response2)) {
-            add_custom_order_note( $order_id, '(Healthcare Provider) : ERROR SENDING IMAGES. Please try again.', true ); 
-            $order->update_meta_data('api_response_images_info', '(Healthcare Provider) : ERROR SENDING IMAGES. Please try again.');                  
-            $order->save(); 
-        
+             if (WC()->session)         
+                WC()->session->set('responseImagesInfo', "ERROR SENDING IMAGES.");            
         } else {        
             $response_body2 = wp_remote_retrieve_body($response2);
             $response_data2 = json_decode($response_body2, true);
-            $order->update_meta_data('api_response_images_info', strtoupper($response_data2['info']));                  
-            $order->save();          
-            add_custom_order_note( $order_id, '(Healthcare Provider) : '.strtoupper($response_data2['info']), true );   
+            if (WC()->session) 
+                WC()->session->set('responseImagesInfo', strtoupper($response_data2['info']));      
         }
 
     
     }
-    
+     
+   
 }
 
+
+
+
+add_action('woocommerce_checkout_order_processed', 'validate_with_external_api_b',10,3);
+
+function validate_with_external_api_b($order_id, $posted_data, $order) {
+
+    if( !empty(WC()->session->get( 'masterId')) && !empty(WC()->session->get( 'visitId')) && !empty(WC()->session->get('responseVisitInfo')) && !empty(WC()->session->get('responseImagesInfo')) && !empty(WC()->session->get( 'payloadData')) ) {
+
+        $order->update_meta_data('api_masterId', sanitize_text_field(WC()->session->get('masterId')));
+        $order->update_meta_data('api_visitId', sanitize_text_field(WC()->session->get('visitId')));        
+        $order->update_meta_data('api_response_visit_info', WC()->session->get('responseVisitInfo'));
+        $order->update_meta_data('api_response_images_info', WC()->session->get('responseImagesInfo'));
+        $order->update_meta_data('api_payload_data', serialize(WC()->session->get('payloadData')));      
+        $order->save(); // Ensure data is saved
+        add_custom_order_note( $order_id, '(Beluga Health message) : '.WC()->session->get('responseVisitInfo'), true );
+        add_custom_order_note( $order_id, '(Beluga Health message) : '.WC()->session->get('responseImagesInfo'), true );
+        
+    }
+
+   
+}
 
 
 
@@ -441,10 +461,10 @@ function handle_visit_response( $data ) {
                 return new WP_REST_Response( array('status' => 400, 'error'   => 'Invalid or missing visitOutcome for CONSULT_CONCLUDED event',), 200 );
             }
             if($params['visitOutcome'] == 'prescribed') {
-                $order->add_order_note("(Healthcare Provider) : PATIENT VISIT HAS BEEN CONCLUDED. THE DOCTOR HAS WRITTEN A PRESCRIPTION.",true );
+                $order->add_order_note("(Beluga Health message) : PATIENT VISIT HAS BEEN CONCLUDED. THE DOCTOR HAS WRITTEN A PRESCRIPTION.",true );
             }
             else {
-                $order->add_order_note("(Healthcare Provider) : PATIENT VISIT HAS BEEN CONCLUDED WITHOUT A PRESCRIPTION. THE DOCTOR ISSUED A REFERRAL INSTEAD.",true );
+                $order->add_order_note("(Beluga Health message) : PATIENT VISIT HAS BEEN CONCLUDED WITHOUT A PRESCRIPTION. THE DOCTOR ISSUED A REFERRAL INSTEAD.",true );
             }
             $order->update_meta_data('visitOutcome', $params['visitOutcome']);
             $order->save();
@@ -469,7 +489,7 @@ function handle_visit_response( $data ) {
                     }
                     $presc_data[] = $field.': '.$med[$field];
                 }
-                $order->add_order_note("(Healthcare Provider) : <br>PRESCRIBED MEDICATION INFO: <br>".implode(', <br>',$presc_data)."",true );
+                $order->add_order_note("(Beluga Health message) : <br>PRESCRIBED MEDICATION INFO: <br>".implode(', <br>',$presc_data)."",true );
                 $medsPrescribed = $order->get_meta('medsPrescribed') ?: [];
                 $medsPrescribed[] = $presc_data;
                 $order->update_meta_data('medsPrescribed', $medsPrescribed);
@@ -478,7 +498,7 @@ function handle_visit_response( $data ) {
             break;
 
         case 'CONSULT_CANCELED':
-            $order->add_order_note("(Healthcare Provider) : PATIENT VISIT HAS BEEN CANCELED.",true );
+            $order->add_order_note("(Beluga Health message) : PATIENT VISIT HAS BEEN CANCELED.",true );
             $order->update_meta_data('visitOutcome', 'canceled');
             $order->save();
 
@@ -496,12 +516,132 @@ function handle_visit_response( $data ) {
 
 }
 
+/*function prefix_get_visit_arguments() {
+    $args = array();
+
+    // masterId parameter.
+    $args['masterId'] = array(
+        'description'       => esc_html__( 'The masterId is used to match a Sosothin order.', 'sosothin' ),
+        'type'              => 'string',
+        'required'          => true,
+        'validate_callback' => function( $value, $request, $param ) {
+            if ( ! is_string( $value ) ) {
+                //return new WP_Error( 'rest_invalid_param', esc_html__( 'The masterId argument must be a string.', 'sosothin' ), array( 'status' => 400 ) );
+                return new WP_REST_Response( array('status' => 400, 'error'   => 'The masterId argument must be a string',), 200 );
+            }
+            return true;
+        },
+        'sanitize_callback' => 'sanitize_text_field',
+    );
+
+    // event parameter.
+    $args['event'] = array(
+        'description'       => esc_html__( 'The event parameter to define the type of operation.', 'sosothin' ),
+        'type'              => 'string',
+        'required'          => true,
+        'enum'              => array( 'CONSULT_CANCELED', 'RX_WRITTEN', 'CONSULT_CONCLUDED', 'DOCTOR_CHAT' ),
+        'validate_callback' => function( $value, $request, $param ) {
+            if ( ! is_string( $value ) ) {
+                //return new WP_Error( 'rest_invalid_param', esc_html__( 'The event argument must be a string.', 'sosothin' ), array( 'status' => 400 ) );
+                return new WP_REST_Response( array('status' => 400, 'error'   => 'The event argument must be a string',), 200 );
+            }
+            $attributes = $request->get_attributes();
+            $args = $attributes['args'][ $param ];
+            if ( ! in_array( $value, $args['enum'], true ) ) {
+                //return new WP_Error( 'rest_invalid_param', sprintf( esc_html__( '%s is not one of %s', 'sosothin' ), $param, implode( ', ', $args['enum'] ) ), array( 'status' => 400 ) );
+                return new WP_REST_Response( array('status' => 400, 'error'   => 'Invalid event type',), 200 );
+
+            }
+            return true;
+        },
+    );
+
+    // visitOutcome parameter (for CONSULT_CONCLUDED event).
+    $args['visitOutcome'] = array(
+        'description'       => esc_html__( 'Visit outcome for CONSULT_CONCLUDED event', 'sosothin' ),
+        'type'              => 'string',
+        'required'          => false,
+        'enum'              => array( 'prescribed', 'referred' ),
+        'sanitize_callback' => 'sanitize_text_field',
+    );
+
+    // docName parameter (for RX_WRITTEN event).
+    $args['docName'] = array(
+        'description'       => esc_html__( 'Doctor name for RX_WRITTEN event', 'sosothin' ),
+        'type'              => 'string',
+        'required'          => false,
+        'sanitize_callback' => 'sanitize_text_field',
+    );
+
+    // medsPrescribed parameter (for RX_WRITTEN event).
+    $args['medsPrescribed'] = array(
+        'description'       => esc_html__( 'List of prescribed meds', 'sosothin' ),
+        'type'              => 'array',
+        'required'          => false,
+        'validate_callback' => function( $value, $request, $param ) {
+            if ( ! is_array( $value ) ) {
+                return new WP_Error( 'rest_invalid_param', esc_html__( 'medsPrescribed must be an array.', 'sosothin' ), array( 'status' => 400 ) );
+            }
+            foreach ( $value as $index => $med ) {
+                $required_fields = array( 'name', 'strength', 'refills', 'quantity', 'medId', 'rxId' );
+                foreach ( $required_fields as $field ) {
+                    if ( ! isset( $med[ $field ] ) || (empty( $med[ $field ] ) && $med[ $field ] != 0  ) ) {
+                        return new WP_Error( 'rest_invalid_param', sprintf( esc_html__( 'Field %s is required for item %d in medsPrescribed', 'sosothin' ), $field, $index ), array( 'status' => 400 ) );
+                    }
+                }
+            }
+            return true;
+        },
+        'items'             => array(
+            'type'       => 'object',
+            'properties' => array(
+                'name'     => array( 'type' => 'string' ),
+                'strength' => array( 'type' => 'string' ),
+                'refills'  => array( 'type' => 'string' ),
+                'quantity' => array( 'type' => 'string' ),
+                'medId'    => array( 'type' => 'string' ),
+                'rxId'     => array( 'type' => 'string' ),
+            ),
+        ),
+    );
+
+    return $args;
+}*/
 
 
+
+
+
+
+
+//write log function created by using error_log and woocommerce function wc_get_logger()
+if (! function_exists('write_log')) {
+                
+    function write_log($log)  {
+        
+        if (is_array($log) || is_object($log)) {
+            if ( function_exists('error_log') && true === WP_DEBUG) {
+                error_log(print_r($log, true));
+            }
+            if (function_exists('wc_get_logger')) {
+                wc_get_logger()->info(wc_print_r($log, true), array( 'source' => 'custom-log' ));
+            }
+        } else {
+            if ( function_exists('error_log') && true === WP_DEBUG) {
+                error_log($log);
+            }
+            if (function_exists('wc_get_logger')) {
+                wc_get_logger()->info($log, array( 'source' => 'custom-log' ));
+            }
+            
+        }
+        
+    }
+}
 
 
 //Convert all images to jpeg format. Compress the images to width: 1000px before encoding (or ensure that all images are <3MB). Encode the compressed images to base64 encoding. Do not include the MIME at the beginning of this string.
-function compress_resize_encode_images($image_fields,$order_id) {
+function compress_resize_encode_images($image_fields,$posted_data) {
     
     $processed_images = [];
 
@@ -509,24 +649,23 @@ function compress_resize_encode_images($image_fields,$order_id) {
     $upload_dir = wp_upload_dir();
     $base_dir = trailingslashit($upload_dir['basedir']);
 
-    foreach ($image_fields as $field => $img_path) {
-        if (empty($img_path)) {
-           // wc_add_notice(sprintf(__('Missing file for %s.', 'sosothin'), $field), 'error');
+    foreach ($image_fields as $field) {
+        if (empty($posted_data[$field])) {
+           // wc_add_notice(sprintf(__('Missing file for %s.', 'woocommerce'), $field), 'error');
             continue;
         }
 
-        $file_path = $base_dir . sanitize_file_name($img_path);
+        $file_path = $base_dir . sanitize_file_name($posted_data[$field]);
 
         if (!file_exists($file_path)) {
-            //wc_add_notice(sprintf(__('File not found for %s.', 'sosothin'), $field), 'error');
-            add_custom_order_note( $order_id, '(System message) : '.sprintf(__('File not found for %s. This image has not been sent.', 'sosothin'), $field), true );
+            wc_add_notice(sprintf(__('File not found for %s.', 'woocommerce'), $field), 'error');
             continue;
         }
 
         // Process the image: Resize, compress, and convert to JPEG
         $image = imagecreatefromstring(file_get_contents($file_path));
         if (!$image) {
-            //wc_add_notice(sprintf(__('Invalid image for %s.', 'sosothin'), $field), 'error');
+            wc_add_notice(sprintf(__('Invalid image for %s.', 'woocommerce'), $field), 'error');
             continue;
         }
 
@@ -550,8 +689,7 @@ function compress_resize_encode_images($image_fields,$order_id) {
 
         // Check the file size (<3MB)
         if (filesize($temp_file) > 3 * 1024 * 1024) {
-            // wc_add_notice(sprintf(__('The uploaded image for %s exceeds 3MB after compression.', 'sosothin'), $field), 'error');
-            add_custom_order_note( $order_id, '(System message) : '.sprintf(__('The uploaded image for %s exceeds 3MB after compression. Please reduce the file size and try uploading again.', 'sosothin'), $field), true );
+            wc_add_notice(sprintf(__('The uploaded image for %s exceeds 3MB after compression.', 'woocommerce'), $field), 'error');
             unlink($temp_file); // Clean up
             continue;
         }
@@ -736,11 +874,11 @@ add_action('init', function () {
                 // Set just the filename (not full path) to be used by compress_resize_encode_images
                 $_POST['doctor_chat_image'] = $filename;
             } else {
-                wc_add_notice(__('Failed to upload image.', 'sosothin'), 'error');
+                wc_add_notice(__('Failed to upload image.', 'woocommerce'), 'error');
             }
         }
 
-        $encoded_chat_image = !empty($_POST['doctor_chat_image']) ? compress_resize_encode_images(['doctor_chat_image' => $_POST['doctor_chat_image']],$order_id)['doctor_chat_image'] : '';
+        $encoded_chat_image = !empty($_POST['doctor_chat_image']) ? compress_resize_encode_images(['doctor_chat_image'],$_POST)['doctor_chat_image'] : '';
         $message =  !empty($_POST['doctor_chat_message']) ? sanitize_textarea_field($_POST['doctor_chat_message']) : '';
         
         $order = wc_get_order($order_id);
@@ -794,9 +932,7 @@ function send_chat_to_doctor_api($order, $entry) {
 
     // Handle API response
     if (is_wp_error($response)) {
-        $response_body = wp_remote_retrieve_body($response);
-        $response_data = json_decode($response_body, true);
-        $error_message = 'There was an error connecting to the Beluga health service. Patient visit is not created. Please contact us. ('.$response_data['error'].')';        
+        $error_message = 'There was an error connecting to the Beluga Health service. Please try again.';
     } else {
         $response_code = wp_remote_retrieve_response_code($response);
         $response_body = wp_remote_retrieve_body($response);
@@ -807,7 +943,7 @@ function send_chat_to_doctor_api($order, $entry) {
         }
     }
     if (!empty($error_message)) {
-        write_log($error_message,'beluga-log');
+        write_log($error_message); 
         wc_add_notice($error_message, 'error');
     }
     else {
@@ -821,39 +957,3 @@ function send_chat_to_doctor_api($order, $entry) {
         }
     }
 }
-
-
-
-
-//write log function created by using error_log and woocommerce function wc_get_logger()
-if (! function_exists('write_log')) {
-                
-    function write_log($log,$log_name = null)  {
-
-        if(empty($log_name)) $log_name = 'custom-log';
-        
-        if (is_array($log) || is_object($log)) {
-            if ( function_exists('error_log') && true === WP_DEBUG) {
-                error_log(print_r($log, true));
-            }
-            if (function_exists('wc_get_logger')) {
-                wc_get_logger()->info(wc_print_r($log, true), array( 'source' => $log_name ));
-            }
-        } else {
-            if ( function_exists('error_log') && true === WP_DEBUG) {
-                error_log($log);
-            }
-            if (function_exists('wc_get_logger')) {
-                wc_get_logger()->info($log, array( 'source' => $log_name ));
-            }
-            
-        }
-        
-    }
-}
-
-
-
-
-
-

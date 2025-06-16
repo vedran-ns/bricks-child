@@ -62,6 +62,30 @@ function display_birthdate_billing_field($fields) {
     return $fields;
 }
 
+//validate the birthdate and ensure the user is at least 18 years old:
+add_action('woocommerce_checkout_process', 'validate_birthdate_field');
+function validate_birthdate_field() {
+    if (isset($_POST['billing_birthdate']) && !empty($_POST['billing_birthdate'])) {
+        $birthdate = sanitize_text_field($_POST['billing_birthdate']);
+        $birth_timestamp = strtotime($birthdate);
+
+        if (!$birth_timestamp) {
+            wc_add_notice(__('Invalid birthdate format.'), 'error');
+            return;
+        }
+
+        $min_age = 18;
+        $age_limit = strtotime("-$min_age years");
+
+        if ($birth_timestamp > $age_limit) {
+            wc_add_notice(__('You must be at least 18 years old to place an order.'), 'error');
+        }
+    } else {
+        wc_add_notice(__('Birthdate is required.'), 'error');
+    }
+}
+
+
 //prefill the date field on checkout via JavaScript
 add_action( 'wp_footer', 'prefill_birthdate_field_js' );
 function prefill_birthdate_field_js() {
@@ -279,7 +303,7 @@ function save_custom_variation_fields($variation_id, $i) {
         'medicine_dispense',
         'medicine_medinfo',
     ];
-    
+	
     foreach ($fields as $field) {
         if (isset($_POST[$field][$i])) {
             $value = sanitize_text_field($_POST[$field][$i]);
@@ -318,7 +342,7 @@ function add_custom_variation_fields_to_cart($cart_item_data, $product_id, $vari
 
 
 // Display custom fields in cart and order details (optional)
-add_filter('woocommerce_get_item_data', 'display_custom_variation_fields_in_cart', 10, 2);
+/*add_filter('woocommerce_get_item_data', 'display_custom_variation_fields_in_cart', 10, 2);
 function display_custom_variation_fields_in_cart($item_data, $cart_item) {
     $fields = [
         //'custom_medicine_concentration' => __('Concentration', 'woocommerce'),
@@ -344,7 +368,7 @@ function display_custom_variation_fields_in_cart($item_data, $cart_item) {
     }
 
     return $item_data;
-}
+}*/
 
 
 
@@ -379,7 +403,7 @@ add_action('woocommerce_single_variation', 'display_custom_fields_on_product_pag
 function display_custom_fields_on_product_page() {
     global $product;
     ?>
-    <h4 id="var-info" style="margin: 20px 0;display:none;">Info</h4>
+	<h4 id="var-info" style="margin: 20px 0;display:none;">Info</h4>
     <div class="variation-custom-fields">
         <div id="custom-variation-fields"></div>
     </div>
@@ -422,7 +446,7 @@ function display_custom_fields_on_product_page() {
                 }
 
                 $('#custom-variation-fields').html(fieldsHtml);
-                $('#var-info').show();
+				$('#var-info').show();
             });
 
             // Clear custom fields when no variation is selected
@@ -483,31 +507,95 @@ function first_order_add_bag() {
 add_action( 'wp_footer', 'woocommerce_checkout_scripts' );
 function woocommerce_checkout_scripts() {
     if (is_checkout()) {
-        $product_name = '';
-        $current_med_use = '';
-        foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {  
-            $product_name = lcfirst($cart_item['data']->get_title());
+		$product_name = '';
+		$current_med_use = '';
+		foreach ( WC()->cart->get_cart() as $cart_item_key => $cart_item ) {  
+   			$product_name = lcfirst($cart_item['data']->get_title());
             if ($cart_item['data'] instanceof WC_Product_Variation) {
-                foreach ($cart_item['data']->get_variation_attributes() as $atr_key => $atr_value) {
-                    if ($atr_key=='attribute_pa_current-medication-use'){
-                        $current_med_use = $atr_value;
-                        break;
-                    }               
-                }
+    			foreach ($cart_item['data']->get_variation_attributes() as $atr_key => $atr_value) {
+    				if ($atr_key=='attribute_pa_current-medication-use'){
+          				$current_med_use = $atr_value;
+    					break;
+        			}				
+      			}
             }
-            break;
-        }
-        //$current_med_use_input_id = $current_med_use == 'yes' ? '#current_meds_sem_tirz_'.$product_name : '#current_meds_sem_tirz_neither';
+			break;
+  		}
+		//$current_med_use_input_id = $current_med_use == 'yes' ? '#current_meds_sem_tirz_'.$product_name : '#current_meds_sem_tirz_neither';
         $current_med_use_input_id = $current_med_use == 'yes' ? '#current_meds_sem_tirz_semaglutide,#current_meds_sem_tirz_tirzepatide' : '#current_meds_sem_tirz_neither';
 
-                
+				
     ?>
-        <script type="text/javascript">
-            
-        jQuery( document ).ready(function( $ ) {  
-            $('#bmi').attr('readonly', true);
-            //$('#current_meds_sem_tirz_field input:not(<?php //echo  $current_med_use_input_id ?>)').attr('disabled', true);   
-            //$('#current_meds_sem_tirz_field input:not(<?php //echo  $current_med_use_input_id ?>)').css('display', 'none');           
+
+    <style type="text/css">
+        /*#################### ajax loader ###################*/
+         .loader {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            left: 115px;     
+            top: 8px;
+            z-index: 9999;
+        }
+        .loader .circular {
+            position: relative;
+            animation: rotate 2s linear infinite;
+            height: 100px;
+            width: 100px;
+        }        
+        .loader .path {
+            stroke-dasharray: 1,200;
+            stroke-dashoffset: 0;
+            animation: dash 1.5s ease-in-out infinite;
+            stroke-linecap: round;
+            stroke: rgb(0, 100, 102);
+        }
+        .ajaxed {
+            position: relative;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        
+        /*.ajaxed:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255,255,255,.8);
+            z-index: 999;
+        }*/
+        @keyframes rotate {
+                100% {
+                    transform: rotate(360deg);
+                }
+            }
+            @keyframes dash {
+                0% {
+                    stroke-dasharray: 1,200;
+                    stroke-dashoffset: 0;
+                }
+                50% {
+                    stroke-dasharray: 89,200;
+                    stroke-dashoffset: -35;
+                }
+                100% {
+                    stroke-dasharray: 89,200;
+                    stroke-dashoffset: -124;
+                }
+            }
+
+
+    </style>
+		<script type="text/javascript">
+			
+		jQuery( document ).ready(function( $ ) {  
+			$('#bmi').attr('readonly', true);
+			//$('#current_meds_sem_tirz_field input:not(<?php //echo  $current_med_use_input_id ?>)').attr('disabled', true);	
+			//$('#current_meds_sem_tirz_field input:not(<?php //echo  $current_med_use_input_id ?>)').css('display', 'none');			
             <?php if($current_med_use == 'yes') { ?>
                     //$('#current_meds_sem_tirz_field label[for="current_meds_sem_tirz_neither"]').hide();
             <?php } 
@@ -525,125 +613,235 @@ function woocommerce_checkout_scripts() {
 
 
 
-            $('#feet, #inches, #pounds').on('keyup mouseup', function () {
-                // Get values from the input fields
-                const feet = parseFloat(jQuery('#feet').val()) || 0;
-                const inches = parseFloat(jQuery('#inches').val()) || 0;
-                const pounds = parseFloat(jQuery('#pounds').val()) || 0;
+			$('#feet, #inches, #pounds').on('keyup mouseup', function () {
+        		// Get values from the input fields
+        		const feet = parseFloat(jQuery('#feet').val()) || 0;
+        		const inches = parseFloat(jQuery('#inches').val()) || 0;
+        		const pounds = parseFloat(jQuery('#pounds').val()) || 0;
 
-                // Convert feet and inches to total inches
-                const totalInches = (feet * 12) + inches;
+        		// Convert feet and inches to total inches
+        		const totalInches = (feet * 12) + inches;
 
-                if (totalInches > 0) {
-                    // Calculate BMI
-                    const bmi = (pounds / (totalInches * totalInches)) * 703;
+        		if (totalInches > 0) {
+        			// Calculate BMI
+        			const bmi = (pounds / (totalInches * totalInches)) * 703;
 
-                    // Display BMI in the #bmi_field element
-                    //jQuery('#bmi_field').html('<h5 style="font-weight: 400;padding-top: 10px;"> Your BMI is: ' + bmi.toFixed(2) + '</h5>');
-                    jQuery('#bmi').val(bmi.toFixed(2)).trigger('change');
-                } else {
-                    // Handle invalid height input
-                    jQuery('#bmi').html('<h5 style="font-weight: 400;padding-top: 10px;"> Your BMI is: ' + 'Enter valid height.'+ '</h5>');
-                }
-            });
-            
-            $('#commonly_side_effects_field input').change(function() {
-                let regime_type = '';
-                let current_dose = '';
+        			// Display BMI in the #bmi_field element
+        			//jQuery('#bmi_field').html('<h5 style="font-weight: 400;padding-top: 10px;"> Your BMI is: ' + bmi.toFixed(2) + '</h5>');
+        			jQuery('#bmi').val(bmi.toFixed(2)).trigger('change');
+        		} else {
+        			// Handle invalid height input
+        			jQuery('#bmi').html('<h5 style="font-weight: 400;padding-top: 10px;"> Your BMI is: ' + 'Enter valid height.'+ '</h5>');
+        		}
+        	});
 
-                if ($('#current_meds_sem_tirz_field input:checked').val() === 'neither') {
-                  if ($('#commonly_side_effects_field input:checked').val() === 'Yes') {
-                    regime_type = 'alternative';
-                    current_dose = 'lowest';
-                  } 
-                  else {
-                    regime_type = 'standard';
-                    current_dose = 'starter';        
-                   }
+            //loader icon html
+            var loaderIcon =
+                    <!-- Loader -->
+                    '<div class="loader ajax-loader">' +
+                    '<svg class="circular">' +
+                    '<circle class="path" cx="50" cy="50" r="20" fill="none" stroke-width="3" stroke-miterlimit="10"/>' +
+                    '</svg>' +                    
+                    '</div>';
+			
+			let protocol_type = 'standard';
+            let regime_type = '';
+            let current_dose = '';
+            let new_dose_prefer = '';
+			
+			if(protocol_type === 'standard') {
+			//STANDARD PROTOCOL
+				$('#current_meds_sem_tirz_field input').change(function() {	
+                    if(jQuery('#prohibited_medications_field input:checked ').val() == '0') return false;
 
-                    $.ajax({
+				    regime_type = 'standard';                     
+                    const current_med = $(this).val(); 
+
+					if ( current_med === 'neither') { 
+						current_dose = 'starter';
+                        new_dose_prefer = null;  
+
+                        if ('' != protocol_type && '' != regime_type && '' != current_dose ) {
+                           $('#prefered_dose_field').addClass('ajaxed ajaxed-search').append(loaderIcon);
+    					   fetch_medics_from_google_sheet(protocol_type,regime_type,current_dose,new_dose_prefer)
+    					}
+
+    					//console.log('Protocol Type:', protocol_type);
+                    }
+				  });
+
+
+
+                $('#current_prescription_picture_yes_no_field input, #current_dose_semaglutide_field input, #current_dose_tirzepatide_field input, #new_dose_field input ').change(function() {    
+                    if(jQuery('#prohibited_medications_field input:checked ').val() == '0') return false;                         
+                    regime_type = 'standard';                    
+                    new_dose_prefer = $('#new_dose_field input:checked ').val();
+                    current_med = $('#current_meds_sem_tirz_field input:checked').val();     
+                    let has_prescription_picture = $('#current_prescription_picture_yes_no_field input:checked').val(); 
+
+                    if ( has_prescription_picture === 'Yes' && '0' != current_med && 'undefined' != current_med && '0' != new_dose_prefer && 'undefined' != new_dose_prefer) {                                            
+                        current_dose = current_med === 'semaglutide' ?  $('#current_dose_semaglutide_field input:checked').val()  : ( current_med === 'tirzepatide' ? $('#current_dose_tirzepatide_field input:checked').val() : '' ) ;
+                    }
+                    else if(has_prescription_picture === 'No') {
+                        current_dose = 'starter-'+current_med;
+                    }
+                    
+
+                    if ('' != protocol_type && '' != regime_type && '' != current_dose && 'undefined' != current_dose ) {
+                       $('#prefered_dose_field').addClass('ajaxed ajaxed-search').append(loaderIcon);
+                       fetch_medics_from_google_sheet(protocol_type,regime_type,current_dose,new_dose_prefer)
+                    }
+
+                    //console.log('Protocol Type2:', protocol_type);
+                  });
+
+
+			}
+			
+			else if(protocol_type === 'individual') {
+			
+				//INDIVIDUAL PROTOCOL
+				$('#commonly_side_effects_field input').change(function() {				
+					regime_type = '';
+					current_dose = '';
+					new_dose_prefer = '';
+
+					if ($('#current_meds_sem_tirz_field input:checked').val() === 'neither') {
+    				  if ($('#commonly_side_effects_field input:checked').val() === 'Yes') {
+    					regime_type = 'alternative';
+    					current_dose = 'lowest';
+    				  } 
+    				  else {
+    					regime_type = 'standard';
+    					current_dose = 'starter';        
+    				   }	
+				    }
+
+                    if ('' != protocol_type && '' != regime_type && '' != current_dose ) {
+                       $('#prefered_dose_field').addClass('ajaxed ajaxed-search').append(loaderIcon);
+                       fetch_medics_from_google_sheet(protocol_type,regime_type,current_dose,new_dose_prefer)
+                    }
+
+				    console.log('Protocol Type:', protocol_type);
+			  });
+			}
+
+
+            //default ajax call function
+            function fetch_medics_from_google_sheet(protocol_type,regime_type,current_dose,new_dose_prefer){
+
+                $.ajax({
                       url: '/wp-json/medics/v1/get-medics',
                       method: 'GET',
                       data: {
+                        protocol_type: protocol_type,
                         regime_type: regime_type,
-                        current_dose: current_dose
+                        current_dose: current_dose,
+                        new_dose_prefer: new_dose_prefer
                       },
                       success: function(response) {
                         //console.log('Google Sheet Response:', response);
 
+                        $('#prefered_dose_field').removeClass('ajaxed').find('.ajax-loader').remove(); 
+
                         // Clear old options
                         $('#prefered_dose').empty();
 
+                        $('#prefered_dose').append(new Option('Choose an option', ''));
+
                         // Loop through returned items
                         response.forEach(function(item) {
-                          const favName = item.original_row['Favorite Name'] || 'Unnamed';
+                          const medName = item.parsed['medicine_name'] || 'N/A';
+                          const dose = item.parsed['dose'] || '';
                           const medId = item.original_row['Medicine Id'] || '';
-                          const strength = item.original_row['Strength'] || '';
+                          const medDesc = item.original_row['Medication'] || '';
+                          const strength = item.original_row['Strength'] || 'N/A';
                           const refills = item.original_row['Refills'] || '';
                           const pharmacyId = item.original_row['Pharmacy ID'] || '';
+                          const quantity = item.original_row['Quantity'] || '';
+                          const category = item.original_row['Category'] || '';
+                          const visitType = item.original_row['Visit Type'] || '';
+                          const price = item.original_row['Price'] || '';
+                          const durationMonths = item.parsed['duration_months'] || '';
+                          const monthText = item.parsed['duration_months'] == '1' ? ' Month' : ' Months';
+                          const medFullName = medName+ ' '+dose+ ' - '+ durationMonths + monthText;
 
-                          // Construct option value (you can change format if needed)
-                          const optionValue = `${medId};${strength};${refills};${pharmacyId}`;
+                          const optionValue = JSON.stringify({'medFullName': medFullName, 'medId': medId, 'strength': strength, 'quantity': quantity, 'category': category, 'visitType': visitType, 'refills': refills, 'medDesc' : medDesc, 'pharmacyId' : pharmacyId,'price' : price });
 
-                          $('#prefered_dose').append(new Option(favName, optionValue));
+                          $('#prefered_dose').append(new Option(medFullName + ' - $'+price, optionValue));
+                          $('#prefered_dose_field .desc').html('');
+                                                       
                         });
                       },
                       error: function(xhr, status, error) {
                         console.error('AJAX Error:', status, error);
+                        $('#prefered_dose_field').removeClass('ajaxed').find('.ajax-loader').remove(); 
+                        // Clear old options
+                        $('#prefered_dose').empty();
+                        $('#prefered_dose').append(new Option('Choose an option', ''));
                       }
-                    });
-
-                }
-
-                console.log('Selected Regime:', regime_type);
-              });
-
-        });
-            
-        //window.onload = function(){jQuery('input[name^="condition_"]').prop('checked',false).trigger('change');}
-        window.onload = function(){
-            setTimeout(function() {
-                jQuery('input[name^="condition_"]').prop('checked',false).trigger('change');
-                //jQuery('#<?php echo  $current_med_use_input_id ?>').click().trigger('change');
-            }, 2000 );
-            
-            // Select the element to observe
-            const targetElement = document.getElementById('not_eligible_field');
-
-            // Create a MutationObserver instance
-            const observer = new MutationObserver((mutationsList) => {
-                mutationsList.forEach((mutation) => {
-                    if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-                        // Check if the element is now visible
-                        if (targetElement.style.display === 'none') {
-                            //console.log('The element is now hidden');
-                             document.getElementById('place_order').style.display="block";
-                            
-                            /*if (document.querySelector('#bmi').value.trim() !== "0") {
-                                document.querySelectorAll('#consent_confirm_bmi_field, #consent_bmi_content_field, #consent_bmi_heading_field')
-    .forEach(el => el.style.display = "block");
-                            }*/
-                            
-                        }
-                        else {
-                          // console.log('The element is now visible');
-                           document.getElementById('place_order').style.display="none";
-                           /*document.querySelectorAll('#consent_confirm_bmi_field, #consent_bmi_content_field, #consent_bmi_heading_field')
-    .forEach(el => el.style.display = "none");*/
-                        }
-                    }
                 });
+
+            }
+			
+
+			$('#prefered_dose').change(function() {                
+                med = $(this).val() ? JSON.parse($(this).val()) : '';
+                if(med) {
+                    $('input[name="prefered_dose_custom_text"]').attr('value', ""+med.medFullName+"");
+                    $('input[name="prefered_dose_custom_price"]').attr('value', ""+med.price+"");
+                    $('input[name="fme_ccfw_price_prefered_dose"]').attr('value', ""+med.price+"");
+                    $('#prefered_dose_field .desc').html(med.medDesc);
+                    jQuery('body').trigger('update_checkout');
+                }
             });
 
-            // Configure the observer to watch for style attribute changes
-            observer.observe(targetElement, { attributes: true });
+		});
+			
+		//window.onload = function(){jQuery('input[name^="condition_"]').prop('checked',false).trigger('change');}
+		window.onload = function(){
+			setTimeout(function() {
+				jQuery('input[name^="condition_"]').prop('checked',false).trigger('change');
+				//jQuery('#<?php echo  $current_med_use_input_id ?>').click().trigger('change');
+			}, 2000 );
+			
+			// Select the element to observe
+			const targetElement = document.getElementById('not_eligible_field');
 
-            // Optionally, stop observing when no longer needed
-            // observer.disconnect();
+			// Create a MutationObserver instance
+			const observer = new MutationObserver((mutationsList) => {
+				mutationsList.forEach((mutation) => {
+					if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+						// Check if the element is now visible
+						if (targetElement.style.display === 'none') {
+							//console.log('The element is now hidden');
+							 document.getElementById('place_order').style.display="block";
+							
+							/*if (document.querySelector('#bmi').value.trim() !== "0") {
+								document.querySelectorAll('#consent_confirm_bmi_field, #consent_bmi_content_field, #consent_bmi_heading_field')
+    .forEach(el => el.style.display = "block");
+							}*/
+							
+						}
+						else {
+						  // console.log('The element is now visible');
+						   document.getElementById('place_order').style.display="none";
+						   /*document.querySelectorAll('#consent_confirm_bmi_field, #consent_bmi_content_field, #consent_bmi_heading_field')
+    .forEach(el => el.style.display = "none");*/
+						}
+					}
+				});
+			});
 
-        
-        }
-        </script>
+			// Configure the observer to watch for style attribute changes
+			observer.observe(targetElement, { attributes: true });
+
+			// Optionally, stop observing when no longer needed
+			// observer.disconnect();
+
+		
+		}
+		</script>
     <?php
     }
 }
@@ -706,14 +904,79 @@ add_filter('site_transient_update_plugins', function ($transient) {
 
 
 
-
+/*##################  add visit status and order details link in customer email ######################*/
 add_action( 'woocommerce_email_customer_details', 'add_beluga_api_response_messages', 10, 4 );
 function add_beluga_api_response_messages( $order, $sent_to_admin, $plain_text, $email ) {
-    if ( $email->id == 'customer_on_hold_order' || $email->id == 'customer_processing_order' || $email->id == 'new_order' ) {
-        //echo '<p>(Beluga Health message): '.$order->get_meta('api_response_visit_info').'. '. $order->get_meta('api_response_images_info').'.</p>'; 
-        printf( __( '<p>(Beluga Health message): %s. %s</p><p style="font-size:13px;">Send a message to the doctor via the <a href="%s">order details page.</a></p>', 'sosothin' ), $order->get_meta('api_response_visit_info'),$order->get_meta('api_response_images_info'),$order->get_view_order_url() ) ;  
-    }   
+    $order = wc_get_order( $order->get_id() );
+   
+    if ( ($email->id == 'customer_on_hold_order' || $email->id == 'customer_processing_order') && !empty($order->get_meta('api_response_visit_info') ) ) { 
+        $pre_text_order_page = !empty($order->get_meta('api_visitId') ) ? 'Send a message to the doctor via the' : 'Visit your';       
+        printf( __( '<p style="font-size:15px;">(Healthcare Provider): %s. %s</p><p style="font-size:15px;">%s <a href="%s">order details page.</a></p>', 'sosothin' ), 
+            $order->get_meta('api_response_visit_info'),
+            $order->get_meta('api_response_images_info'),
+            $pre_text_order_page,
+            $order->get_view_order_url() ) ;  
+    } 
+
+    if ( $email->id == 'new_order' && !empty($order->get_meta('api_response_visit_info') ) ) {        
+        printf( __( '<p>(Healthcare Provider): %s. %s</p>', 'sosothin' ), 
+            $order->get_meta('api_response_visit_info'),
+            $order->get_meta('api_response_images_info') ) ;  
+    }     
+
+}
+
+/*##################  show visit and images status on thank you page ######################*/
+add_filter('woocommerce_thankyou_order_received_text', function ($text, $order) {
+    if ($order && !empty($order->get_meta('api_response_visit_info')) ) { 
+         $pre_text_order_page = !empty($order->get_meta('api_visitId') ) ? 'Send a message to the doctor via the' : 'Visit your';       
+        return $text . sprintf(
+            __(
+                ' <br><span %s>(Healthcare Provider): %s. %s</span><br><span>%s <a href="%s" style="text-decoration:underline;">order details page.</a></span>',
+                'sosothin'
+            ),
+            empty($order->get_meta('api_visitId')) ? 'style="color:red;"' : '',
+            esc_html($order->get_meta('api_response_visit_info')),
+            esc_html($order->get_meta('api_response_images_info')),
+            $pre_text_order_page,
+            esc_url($order->get_view_order_url())
+        );
+    }
+    return $text;
+}, 10, 2);
+
+
+/*##################  redirect from cart to checkout ######################*/
+add_filter('add_to_cart_redirect', 'cw_redirect_add_to_cart');
+    function cw_redirect_add_to_cart() {
+       global $woocommerce;
+       $cw_redirect_url_checkout = $woocommerce->cart->get_checkout_url();
+       return $cw_redirect_url_checkout;
+}
+
+/*##################  change add to cart text on button ######################*/
+add_filter( 'woocommerce_product_single_add_to_cart_text', 'cw_btntext_cart' );
+add_filter( 'woocommerce_product_add_to_cart_text', 'cw_btntext_cart' );
+function cw_btntext_cart() {
+    return __( 'Buy Now', 'woocommerce' );
+}
+
+/*##################  hide add to cart message ######################*/
+add_filter( 'wc_add_to_cart_message_html', 'custom_hide_add_to_cart_message_for_product', 10, 2 );
+function custom_hide_add_to_cart_message_for_product( $message, $products ) {
+    // Define the product ID(s) for which the message should be hidden
+    $hidden_product_ids = array(1985); 
+    foreach ( $products as $product_id => $quantity ) {
+        if ( in_array( $product_id, $hidden_product_ids ) ) {
+            return ''; // Hide the message
+        }
+    }
+    return $message; 
 }
 
 
 
+/*##################  increase timeout for HTTP requests  ######################*/
+add_filter( 'http_request_timeout', function( $timeout ) {
+    return 15; // seconds
+});

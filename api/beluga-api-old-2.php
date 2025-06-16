@@ -1,48 +1,28 @@
 <?php
     defined( 'ABSPATH' ) || die( "Can't access directly" );
 
-add_action('woocommerce_before_checkout_process', 'check_api_availability_before_checkout');
-function check_api_availability_before_checkout() {
-    $test_response = wp_remote_post('https://api-staging.belugahealth.com/visit/createNoPayPhotos', array(
-        'method'  => 'POST',
-        'timeout' => 15, 
-    ));
-    
+add_action('woocommerce_before_checkout_process', 'get_payload_data');
 
-    if (is_wp_error($test_response)) {
-        $error_message = $test_response->get_error_message();
-        $error_code = $test_response->get_error_code();
+function get_payload_data() {
 
-        $error_message = 'There was an error connecting to the Health provider service. Please try again. (' . $error_message . ' - Error Code: ' . $error_code . ')';
-        wc_add_notice($error_message, 'error');
-    }
-     /*else {
-        $test_response_code = wp_remote_retrieve_response_code($test_response);
+    $posted_data = WC()->checkout->get_posted_data();
 
-        if ($test_response_code === 400) {
-            
-        } 
-    }*/
-}
-
-add_action('woocommerce_checkout_order_processed', 'get_save_payload_data_to_ordermeta', 10, 3);
-
-function get_save_payload_data_to_ordermeta($order_id, $posted_data, $order) {
-   
+    //write_log($posted_data);  
     //write_log(json_decode($posted_data['prefered_dose']));
     $prefered_dose_data = isset($posted_data['current_meds_sem_tirz']) ? json_decode($posted_data['prefered_dose']) : '';
     $product_name = '';
-    $med_id = $prefered_dose_data ? $prefered_dose_data->medId : '';    
+    $product_sku = $prefered_dose_data ? $prefered_dose_data->medId : '';
+    //$product_med_cat = $prefered_dose_data ? $prefered_dose_data->medId : '';
     $product_med_str = $prefered_dose_data ? $prefered_dose_data->strength : '';
     $product_med_qty = $prefered_dose_data ? $prefered_dose_data->quantity : '';
     $product_med_ref = $prefered_dose_data ? $prefered_dose_data->refills : '';
-    $current_dose = $prefered_dose_data ? $prefered_dose_data->category : '';      
+    $current_dose = $prefered_dose_data ? $prefered_dose_data->category : '';  
+    //$current_med_use = '';
+    //$weekly_dose_preference = '';
     $visit_type = $prefered_dose_data ? $prefered_dose_data->visitType : '';
     $pharmacy_id = $prefered_dose_data ? $prefered_dose_data->pharmacyId : '';
 
-    $glp1_order = false;
-
-    foreach( $order->get_items( 'line_item' ) as $item_id => $item ) {
+    foreach( WC()->cart->get_cart() as $cart_item_key => $item ) {
 
         // Get parent product object
         $product_id = $item['product_id'];
@@ -50,17 +30,12 @@ function get_save_payload_data_to_ordermeta($order_id, $posted_data, $order) {
         $product_name = $parent_product->get_title();       
         
         
-        if( !has_term( 'glp-1', 'product_cat', $product_id ) ) {
-            continue;  
-        }
-        else  { 
-            $glp1_order = true;   
-        }  
+        if( !has_term( 'glp-1', 'product_cat', $product_id ) ) continue;       
 
     }
 
     
-    if( !$glp1_order ) return;
+    if( !has_term( 'glp-1', 'product_cat', $product_id ) ) return;
 
     $current_past_med_conds_array = [];
     foreach ($posted_data as $key => $value) {
@@ -117,16 +92,17 @@ function get_save_payload_data_to_ordermeta($order_id, $posted_data, $order) {
                 "weightlossPreference" => isset($posted_data['new_dose']) ? sanitize_text_field($posted_data['new_dose']) : 'N/A',
                 "currentDose" => isset($current_dose) ? sanitize_text_field($current_dose) : 'N/A',
                 "patientPreference" => [
-                    [                        
+                    [
+                        //"name" => $product_name.' '.$weekly_dose_preference,
                         "name" => $prefered_dose_data ? $prefered_dose_data->medFullName : '',
                         "strength" => $product_med_str,
                         "quantity" => $product_med_qty,
                         "refills" => $product_med_ref,
-                        "medId" => $med_id
+                        "medId" => $product_sku
                     ]
                 ],                         
             ],
-            "masterId" => "".$order_id."",
+            "masterId" => '',
             "company" => 'soSoThin',
             "pharmacyId" => $pharmacy_id,
             "visitType" => $visit_type
@@ -233,35 +209,39 @@ function get_save_payload_data_to_ordermeta($order_id, $posted_data, $order) {
              $image_fields['full_body_image'] = $posted_data['full_body_image'];
         }
 
-      //store payload Data and image fields in order meta        
-        $order->update_meta_data('api_payload_data', serialize($args1));  
-        $order->update_meta_data('api_image_fields', $image_fields);    
-        $order->save();
-
-         
-
-         // If the medication product GLP-1 has been found by medicine id (SKU), then add it to the order 
-        $product_medic_id = wc_get_product_id_by_sku($med_id);  // Product Medicine Id on the Beluga dashbord should be equal to SKU in wc product page  
-        //$fee_id = 'additional_fee'; 
-
-        
-        if ($product_medic_id) {            
-            $order->add_product(wc_get_product($product_medic_id), 1);
-
-            // Remove med product stored as an additional fee
-            foreach ($order->get_fees() as $fee) {
-               // if ($fee->get_name() === $fee_id) {
-                    $order->remove_item($fee->get_id());
-                //}
-            }
-           
-            $order->save();
-        } else {
-            write_log("The product with SKU '{$sku}' has not been found.","beluga-log");
-        }
+      //store masterId,visitId,responseInfo,payloadData in wc session        
+        if (WC()->session) {
+           // WC()->session->set('masterId', $response_data['data']['masterId']); 
+            //WC()->session->set('visitId', $response_data['data']['visitId']);                       
+            WC()->session->set('payloadData', $args1);
+            WC()->session->set('imageFields', $image_fields);
+        }  
 
 }
 
+
+
+/**
+ * Get a payload data from the wc session, set a masterId in payload with order_id, get image fields and save all to the order meta data
+ */
+add_action('woocommerce_checkout_order_processed', 'save_data_to_order',10,3);
+
+function save_data_to_order($order_id, $posted_data, $order) {
+
+    if( !empty( WC()->session->get( 'payloadData') ) ) {       
+        $payloadData = WC()->session->get('payloadData');
+        $payloadData['masterId'] = "".$order_id."";
+        $order->update_meta_data('api_payload_data', serialize($payloadData));  
+        $order->update_meta_data('api_image_fields', WC()->session->get('imageFields'));    
+        $order->save(); // Ensure data is saved
+        
+        write_log('Payload data and image fields have been saved to the order meta!','beluga-log');        
+    }
+    else {
+        write_log('Payload data in the session is empty!','beluga-log'); 
+    }
+   
+}
 
 
 /**
@@ -275,7 +255,7 @@ function send_form_data_create_beluga_visit( $order_id ) {
 
     $order = wc_get_order( $order_id );
 
-    if(empty($order->get_meta('api_payload_data') )) {
+    if(empty(($order->get_meta('api_payload_data'))) {
         write_log('Something went wrong, patient payload data is empty!','beluga-log');
         add_custom_order_note( $order_id, '(System error) : Something went wrong, patient payload data is empty!', true ); 
         return;
@@ -285,14 +265,13 @@ function send_form_data_create_beluga_visit( $order_id ) {
 
     $image_fields = $order->get_meta('api_image_fields') ;
 
-    write_log($payloadData);
+    //write_log($payloadData);
     //write_log($image_fields);
 
     $response = wp_remote_post( 'https://api-staging.belugahealth.com/visit/createNoPayPhotos', 
         array(
           'method' => 'POST',
           'httpversion' => '1.0',
-          'timeout' => 60,
           'headers' => array(
            'Authorization' => 'Bearer z17DZCRW9jjUwuG3uRNr',
             'Content-Type' => 'application/json'),
@@ -304,13 +283,10 @@ function send_form_data_create_beluga_visit( $order_id ) {
 
      // Handle API response
     if (is_wp_error($response)) {
-        $error_message = $response->get_error_message();
-        $error_code = $response->get_error_code();
-    
-        $error_message = 'There was an error connecting to the Health provider service. Patient visit is not created. Please contact us. ('.$error_message.')';    
-    
-    } 
-    else {
+        $response_body = wp_remote_retrieve_body($response);
+        $response_data = json_decode($response_body, true);
+        $error_message = 'There was an error connecting to the Beluga health service. Patient visit is not created. Please contact us. ('.$response_data['error'].')';
+    } else {
         $response_code = wp_remote_retrieve_response_code($response);
         $response_body = wp_remote_retrieve_body($response);
         $response_data = json_decode($response_body, true);
@@ -851,9 +827,3 @@ if (! function_exists('write_log')) {
         
     }
 }
-
-
-
-
-
-

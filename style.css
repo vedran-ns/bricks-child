@@ -22,6 +22,9 @@ form.woocommerce-checkout.bricks-default-checkout {
 .woocommerce-checkout .woocommerce-additional-fields__field-wrapper label {
   	font-weight: 400;
 }
+#fme_prescription_picture {
+  	width: auto;
+}
 #prefered_dose_field {
 	border: 2px solid rgba(43, 41, 35, 0.47);
 	padding: 12px;
@@ -32,8 +35,10 @@ form.woocommerce-checkout.bricks-default-checkout {
 	border: 1px solid #b9b9b9;
 	width: auto;
 	padding-right: 35px;
+	margin-right: 10px;
+  margin-bottom: 5px;
 }
-#id_photo_field, #full_body_image_field, #current_meds_side_efects_textarea_field, #prescription_picture_field, #selected_medical_conditions_field, #current_medical_conditions_field, #current_medications_list_dosages_field, #current_allergies_list_field, #id_photo_content_field, #full_body_image_content_field, #consent_glp1_gip_content_field {
+#id_photo_field, #full_body_image_field, #current_meds_side_efects_textarea_field, #prescription_picture_field, #selected_medical_conditions_field, #current_medical_conditions_field, #current_medications_list_dosages_field, #current_allergies_list_field, #id_photo_content_field, #full_body_image_content_field, #consent_glp1_gip_content_field, #consent_pregnancy_content_field, #consent_bmi_content_field, #consent_gallbladder_content_field, #consent_individualized_medication_content_field, #consent_truthfulness_content_field {
 	border: 1px solid rgba(128, 128, 128, 0.47);
 	padding: 12px;
 	margin: revert;
@@ -58,6 +63,12 @@ form.woocommerce-checkout.bricks-default-checkout {
   	border: 2px solid #a48b04;
   	padding: 15px;
 		border-radius: 10px;
+}
+.woocommerce .woocommerce-notice.woocommerce-notice--success {
+	  color: var(--bricks-color-hljahe)!important;
+	  border: 1px solid rgb(0, 100, 102);
+	  padding: 10px;
+	  font-size: 17px;
 }
 .doctor-chat-form {
 	  padding: 15px;
