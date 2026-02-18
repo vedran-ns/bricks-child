@@ -237,7 +237,7 @@ function validate_with_external_api() {
           'method' => 'POST',
           'httpversion' => '1.0',
           'headers' => array(
-           'Authorization' => 'Bearer z17DZCRW9jjUwuG3uRNr',
+           'Authorization' => 'Bearer token',
             'Content-Type' => 'application/json'),
           'body' => json_encode($args1, JSON_UNESCAPED_SLASHES)
            )
@@ -311,7 +311,7 @@ function validate_with_external_api() {
           'method' => 'POST',
           'httpversion' => '1.0',
           'headers' => array(
-           'Authorization' => 'Bearer z17DZCRW9jjUwuG3uRNr',
+           'Authorization' => 'Bearer token',
             'Content-Type' => 'application/json'),
           'body' => json_encode($args_photos, JSON_UNESCAPED_SLASHES)
            )
@@ -874,7 +874,7 @@ function send_chat_to_doctor_api($order, $entry) {
           'method' => 'POST',
           'httpversion' => '1.0',
           'headers' => array(
-           'Authorization' => 'Bearer z17DZCRW9jjUwuG3uRNr',
+           'Authorization' => 'Bearer token',
             'Content-Type' => 'application/json'),
           'body' => json_encode($chat_args, JSON_UNESCAPED_SLASHES)
            )
