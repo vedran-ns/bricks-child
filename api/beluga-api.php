@@ -294,7 +294,7 @@ function send_form_data_create_beluga_visit( $order_id ) {
           'httpversion' => '1.0',
           'timeout' => 60,
           'headers' => array(
-           'Authorization' => 'Bearer z17DZCRW9jjUwuG3uRNr',
+           'Authorization' => 'Bearer Token',
             'Content-Type' => 'application/json'),
           'body' => json_encode($payloadData, JSON_UNESCAPED_SLASHES)
            )
@@ -360,7 +360,7 @@ function send_form_data_create_beluga_visit( $order_id ) {
           'method' => 'POST',
           'httpversion' => '1.0',
           'headers' => array(
-           'Authorization' => 'Bearer z17DZCRW9jjUwuG3uRNr',
+           'Authorization' => 'Bearer Token',
             'Content-Type' => 'application/json'),
           'body' => json_encode($args_photos, JSON_UNESCAPED_SLASHES)
            )
@@ -785,7 +785,7 @@ function send_chat_to_doctor_api($order, $entry) {
           'method' => 'POST',
           'httpversion' => '1.0',
           'headers' => array(
-           'Authorization' => 'Bearer z17DZCRW9jjUwuG3uRNr',
+           'Authorization' => 'Bearer Token',
             'Content-Type' => 'application/json'),
           'body' => json_encode($chat_args, JSON_UNESCAPED_SLASHES)
            )
